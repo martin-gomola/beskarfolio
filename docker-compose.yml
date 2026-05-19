@@ -1,0 +1,57 @@
+services:
+  # Backend API (Stateless - localStorage-only)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: beskarfolio-api
+    env_file:
+      - config/.env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      # Security (set in config/.env)
+      - BESKARFOLIO_API_KEY=${BESKARFOLIO_API_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:${FRONTEND_PORT:-8080}}
+      - TRUSTED_HOSTS=${TRUSTED_HOSTS:-localhost,127.0.0.1}
+      # Price provider (optional): set PRICE_PROVIDER=fmp/finnhub and provide API keys via config/.env
+      - PRICE_PROVIDER=${PRICE_PROVIDER:-auto}
+      - FMP_API_KEY=${FMP_API_KEY:-}
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
+      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
+    ports:
+      - "8060:8060"
+    volumes:
+      - ./backend/data:/app/data  # Data directory (historical prices, exchange rates)
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8060/health', timeout=5)",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: beskarfolio-web
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+
+# Environment & secrets
+.env
+config/.env
+.mcp.json
+secrets.toml
+
+# IDE & editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Caches
+.cache/
+.ruff_cache/
+.mypy_cache/
+.yfinance_cache/
+
+# Logs
+*.log
+logs/
+
+# Local development
+tmp/
+backups/
+NOTES.md
+
+# Backend data (generated at runtime / personal portfolio data)
+backend/data/*.db
+backend/data/raw/ibkr_*.txt
+backend/data/historical_prices/
+backend/data/exchange_rates.json
+backend/data/latest_prices.json
+
+# Claude IDE (developer-specific)
+.claude/
+
+# Agent / IDE / tooling configs (personal)
+.agents/
+.cursor/
+.omx/
+.code-review-graph/
+
+# Local dev tools
+bruno/
+mcp-server/
+test-screenshots/
+
+# Documentation (internal notes)
+GEMINI.md
+
+# Cursor
+.cursorignore
+.cursorindexingignore

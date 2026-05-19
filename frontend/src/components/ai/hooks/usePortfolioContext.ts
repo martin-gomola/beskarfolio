@@ -1,0 +1,159 @@
+import { useMemo } from 'react'
+import { Holding, PortfolioSummary, TaxFreeHolding } from '../../../types'
+import { TickerInfo, AISettings, PortfolioHolding, TICKER_INFO_CACHE_KEY } from '../types'
+import { TICKER_SECTORS, ETF_PATTERNS, HORIZON_LABELS, GOAL_LABELS } from '../constants'
+import { PromptContext } from '../prompts/types'
+
+const loadTickerInfoCache = (): Record<string, TickerInfo> => {
+  try {
+    const cached = localStorage.getItem(TICKER_INFO_CACHE_KEY)
+    return cached ? JSON.parse(cached) : {}
+  } catch {
+    return {}
+  }
+}
+
+const getSector = (ticker: string, cache: Record<string, TickerInfo>): string => {
+  if (cache[ticker]?.sector) return cache[ticker].sector!
+  if (ETF_PATTERNS.some(p => ticker.toUpperCase().includes(p))) return 'ETF/Index'
+  if (ticker.endsWith('.DE') && ETF_PATTERNS.some(p => ticker.includes(p))) return 'ETF/Index'
+  return TICKER_SECTORS[ticker] || 'Other'
+}
+
+const getRegion = (ticker: string, cache: Record<string, TickerInfo>): string => {
+  if (cache[ticker]?.region) return cache[ticker].region!
+  if (ticker.endsWith('.DE') || ticker.endsWith('.PA') || ticker.endsWith('.AS')) return 'EU'
+  if (ticker.endsWith('.HK') || ticker.endsWith('.T')) return 'Asia'
+  return 'US'
+}
+
+const buildTaxFreeSection = (taxFreeData: TaxFreeHolding[]): string => {
+  if (!taxFreeData.length) return ''
+
+  const lines = taxFreeData.map(t => {
+    const pct = t.tax_free_pct.toFixed(0)
+    const nextDate = t.next_tax_free_date
+      ? `, next ${t.next_tax_free_shares} shares tax-free on ${t.next_tax_free_date}`
+      : ''
+    return `- ${t.ticker}: ${t.tax_free_shares}/${t.total_shares} shares tax-free (${pct}%)${nextDate}`
+  })
+
+  return `### Tax-Free Status (Slovak 365-day rule, FIFO):
+${lines.join('\n')}`
+}
+
+export function usePortfolioContext(
+  holdings: Holding[],
+  summary: PortfolioSummary | null,
+  settings: AISettings,
+  taxFreeData?: TaxFreeHolding[] | null
+): { portfolioData: PortfolioHolding[] | null; promptContext: PromptContext | null } {
+
+  const portfolioData = useMemo(() => {
+    if (!holdings.length) return null
+
+    const tickerCache = loadTickerInfoCache()
+    const totalValue = holdings.reduce((sum, h) => sum + (h.current_value_eur || 0), 0)
+
+    return holdings
+      .map(h => ({
+        ticker: h.ticker,
+        shares: h.shares,
+        avgPrice: h.avg_buy_price || 0,
+        currentPrice: h.current_price || 0,
+        value: h.current_value_eur || 0,
+        weight: totalValue > 0 ? ((h.current_value_eur || 0) / totalValue * 100).toFixed(1) : '0',
+        gainLoss: h.gain_loss || 0,
+        gainLossPercent: h.gain_loss_pct || 0,
+        currency: h.currency || 'EUR',
+        sector: getSector(h.ticker, tickerCache),
+        region: getRegion(h.ticker, tickerCache)
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [holdings])
+
+  const promptContext = useMemo((): PromptContext | null => {
+    if (!portfolioData || !summary) return null
+
+    const holdingsTable = portfolioData
+      .map(h => {
+        const sym = h.currency === 'USD' ? '$' : '€'
+        const avgPrice = h.avgPrice.toFixed(2)
+        const currentPrice = h.currentPrice.toFixed(2)
+        const pnl = `${h.gainLossPercent >= 0 ? '+' : ''}${h.gainLossPercent.toFixed(0)}%`
+        return `- ${h.ticker} [${h.sector}, ${h.region}]: ${h.shares}x @ ${sym}${avgPrice} avg → ${sym}${currentPrice} now (${h.weight}%, ${pnl})`
+      })
+      .join('\n')
+
+    const sectorBreakdown: Record<string, number> = {}
+    const regionBreakdown: Record<string, number> = {}
+    portfolioData.forEach(h => {
+      const weight = parseFloat(h.weight)
+      sectorBreakdown[h.sector] = (sectorBreakdown[h.sector] || 0) + weight
+      regionBreakdown[h.region] = (regionBreakdown[h.region] || 0) + weight
+    })
+
+    const sectorSummary = Object.entries(sectorBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .map(([sector, weight]) => `${sector}: ${weight.toFixed(0)}%`)
+      .join(', ')
+
+    const regionSummary = Object.entries(regionBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .map(([region, weight]) => `${region}: ${weight.toFixed(0)}%`)
+      .join(', ')
+
+    const totalValue = summary.total_value || 0
+    const totalGainLoss = summary.total_gain_loss || 0
+    const totalReturn = summary.total_gain_loss_pct || 0
+
+    const profile = settings.profile
+    const hasProfile = !!(profile?.age || profile?.horizon || profile?.goal)
+    const profileSection = hasProfile ? `
+### Investor Profile:
+${profile?.age ? `- **Age:** ${profile.age} years old` : ''}
+${profile?.horizon ? `- **Investment Horizon:** ${HORIZON_LABELS[profile.horizon]}` : ''}
+${profile?.goal ? `- **Primary Goal:** ${GOAL_LABELS[profile.goal]}` : ''}
+`.trim() : ''
+
+    const hasTaxFreeData = !!(taxFreeData && taxFreeData.length > 0)
+    const taxFreeSection = hasTaxFreeData ? buildTaxFreeSection(taxFreeData!) : ''
+
+    const baseContext = `
+## My Portfolio
+${hasProfile ? `\n${profileSection}\n` : ''}
+**Total Value:** €${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+**Total P&L:** €${totalGainLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%)
+**Number of Holdings:** ${holdings.length}
+
+### Sector Breakdown:
+${sectorSummary}
+
+### Geographic Breakdown:
+${regionSummary}
+
+### Holdings (sorted by value):
+${holdingsTable}
+${hasTaxFreeData ? `\n${taxFreeSection}` : ''}
+`.trim()
+
+    return {
+      holdingsTable,
+      sectorSummary,
+      regionSummary,
+      totalValue,
+      totalGainLoss,
+      totalReturn,
+      holdingsCount: holdings.length,
+      portfolioData,
+      profile,
+      hasProfile,
+      profileSection,
+      taxFreeSection,
+      hasTaxFreeData,
+      baseContext,
+    }
+  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData])
+
+  return { portfolioData, promptContext }
+}

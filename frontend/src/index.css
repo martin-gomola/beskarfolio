@@ -1,0 +1,290 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-700;
+  }
+  
+  body {
+    @apply text-gray-100;
+    margin: 0;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(34, 197, 94, 0.06) 0%, transparent 55%),
+      #0f1c14;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input, select, textarea {
+    @apply bg-[#1e2422] border-gray-700 text-gray-100;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    --tw-ring-color: #22c55e;
+    border-color: #22c55e;
+  }
+}
+
+/* Glass surfaces — frosted panel effects */
+.glass {
+  background: rgba(16, 20, 18, 0.70);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.03),
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.2),
+    0 8px 16px -4px rgba(0, 0, 0, 0.25);
+}
+
+.glass-nav {
+  background: rgba(12, 15, 14, 0.82);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+}
+
+/* Keyboard focus ring on glass surfaces — the browser default is nearly
+   invisible against the blurred dark background. Uses the accent-400 token. */
+.glass:focus-visible {
+  outline: 2px solid #3dd68c;
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e2422;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* React DatePicker Dark Mode Styles */
+.react-datepicker {
+  @apply bg-[#1e2422] border-gray-700;
+  font-family: inherit;
+}
+
+.react-datepicker__header {
+  @apply bg-[#0f1c14] border-b border-gray-700;
+  padding-top: 8px;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name {
+  @apply text-gray-100;
+}
+
+.react-datepicker__day {
+  @apply text-gray-300 hover:bg-gray-700;
+  border-radius: 4px;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #15803d;
+  color: #fff;
+}
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--keyboard-selected:hover {
+  background-color: #166534;
+}
+
+.react-datepicker__day--today {
+  font-weight: 700;
+  color: #3dd68c;
+}
+
+.react-datepicker__day--outside-month {
+  @apply text-gray-600;
+}
+
+.react-datepicker__day--disabled {
+  @apply text-gray-600 cursor-not-allowed hover:bg-transparent;
+}
+
+.react-datepicker__navigation {
+  top: 10px;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #9ca3af;
+}
+
+.react-datepicker__navigation:hover *::before {
+  border-color: #f3f4f6;
+}
+
+.react-datepicker__triangle {
+  display: none;
+}
+
+/* ===========================================
+   ANIMATIONS - Smooth UX transitions
+   =========================================== */
+
+/* Toast slide in from right */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+/* Page/Tab fade in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+/* Modal backdrop fade */
+@keyframes fade-in-fast {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade {
+  animation: fade-in-fast 0.15s ease-out;
+}
+
+/* Modal slide up */
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+/* Card hover lift effect */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 4px 8px rgba(0, 0, 0, 0.25),
+    0 16px 32px -8px rgba(0, 0, 0, 0.35);
+}
+
+/* Button press effect */
+.btn-press {
+  transition: transform 0.1s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Table row hover */
+.row-hover {
+  transition: background-color 0.15s ease;
+}
+
+/* Stagger animation for lists */
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-stagger {
+  animation: stagger-in 0.3s ease-out backwards;
+}
+
+.animate-stagger:nth-child(1) { animation-delay: 0ms; }
+.animate-stagger:nth-child(2) { animation-delay: 50ms; }
+.animate-stagger:nth-child(3) { animation-delay: 100ms; }
+.animate-stagger:nth-child(4) { animation-delay: 150ms; }
+.animate-stagger:nth-child(5) { animation-delay: 200ms; }
+.animate-stagger:nth-child(6) { animation-delay: 250ms; }
+.animate-stagger:nth-child(7) { animation-delay: 300ms; }
+.animate-stagger:nth-child(8) { animation-delay: 350ms; }
+.animate-stagger:nth-child(9) { animation-delay: 400ms; }
+.animate-stagger:nth-child(10) { animation-delay: 450ms; }
+
+/* Number count up effect (use with JS) */
+.number-animate {
+  transition: opacity 0.2s ease;
+}
+
+/* Skeleton placeholder (static, no animation) */
+.skeleton-shimmer {
+  background: #1e2422;
+}
+
+/* Spin for loading (only for explicit loading spinners) */
+.animate-spin-slow {
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Success checkmark pop */
+@keyframes pop {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-pop {
+  animation: pop 0.3s ease-out;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

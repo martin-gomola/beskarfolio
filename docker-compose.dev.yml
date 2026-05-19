@@ -1,0 +1,65 @@
+# Development overrides for faster development
+#
+# Key differences from production:
+# - Frontend: Port 3000 (Vite dev server) instead of nginx on the production host port
+#   - Production uses nginx (port 80 internal → configurable host port, default 8080)
+#   - Dev uses Vite (port 5173 internal → 3000 host)
+#   - The inherited production binding is remapped by `make dev` to avoid 8080 conflicts
+# - Backend: Live reload enabled
+# - Volumes: Mounted for hot reload
+services:
+  # Backend with volume mounts for live reload
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production  # Skip builder stage in dev for speed
+    user: root  # Run as root in dev mode to avoid Podman permission issues
+    volumes:
+      - ./backend:/app  # Live reload for backend code
+      - ./backend/data:/app/data  # Data directory (includes historical prices)
+    env_file:
+      - config/.env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - RELOAD=true  # Enable auto-reload in development
+      # Security (optional in dev - defaults to localhost only)
+      - BESKARFOLIO_API_KEY=${BESKARFOLIO_API_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:${FRONTEND_PORT:-8080}}
+      - TRUSTED_HOSTS=${TRUSTED_HOSTS:-localhost,127.0.0.1}
+      # Price provider (optional): set PRICE_PROVIDER=fmp/finnhub and provide API keys via config/.env
+      - PRICE_PROVIDER=${PRICE_PROVIDER:-auto}
+      - FMP_API_KEY=${FMP_API_KEY:-}
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY:-}
+      - TWELVE_DATA_API_KEY=${TWELVE_DATA_API_KEY:-}
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8060", "--reload"]
+
+  # Frontend with volume mounts for live reload
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: build  # Use build stage for development
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    ports:
+      - "3000:5173"  # Vite dev server (different from prod port 8080)
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://backend:8060  # Use Docker service name for API proxy
+      # Docker Desktop/macOS sometimes drops file system events; force polling so edits trigger HMR reliably.
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=300
+      # Ensure the browser connects HMR websocket to the exposed host port (3000), not the container port (5173).
+      - VITE_HMR_HOST=localhost
+      - VITE_HMR_CLIENT_PORT=3000
+      - VITE_USE_POLLING=true
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
