@@ -32,6 +32,10 @@ services:
       # the Twelve Data quota. Manual "Update Prices" button still works.
       - key: VITE_DEMO_MODE
         value: "true"
+      # Analytics tag injected at build time by frontend/scripts/inject-analytics.mjs
+      # Value lives in the Render dashboard so the tracking ID isn't in git.
+      - key: ANALYTICS_SCRIPT
+        sync: false
     routes:
       - type: rewrite
         source: /*
