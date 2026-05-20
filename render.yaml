@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: beskarfolio-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: PRICE_PROVIDER
+        value: auto
+      - key: CORS_ORIGINS
+        value: https://beskarfolio-web.onrender.com
+      - key: TRUSTED_HOSTS
+        value: beskarfolio-api.onrender.com
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: beskarfolio-web
+    runtime: static
+    plan: free
+    region: frankfurt
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://beskarfolio-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

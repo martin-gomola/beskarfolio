@@ -3,17 +3,22 @@
  */
 
 // API Configuration
-// Smart URL detection: localhost → direct backend, production → relative path
+// Smart URL detection:
+//   - VITE_API_URL env var (set at build time, used for Render and similar split deploys)
+//   - localhost → direct backend
+//   - otherwise → relative path (nginx handles routing in self-hosted Docker)
 const getApiBaseUrl = (): string => {
+  const buildTimeUrl = import.meta.env.VITE_API_URL as string | undefined
+  if (buildTimeUrl) {
+    return buildTimeUrl.replace(/\/$/, '')
+  }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname
-    // In development (localhost), call backend directly (Vite proxy broken in Docker)
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8060'  // No /api - service calls include it
+      return 'http://localhost:8060'
     }
   }
-  // In production, use relative path (nginx handles routing)
-  return ''  // No /api - service calls include it
+  return ''
 }
 
 export const API_BASE_URL = getApiBaseUrl()
