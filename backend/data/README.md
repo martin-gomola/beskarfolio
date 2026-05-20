@@ -46,7 +46,7 @@ This directory contains runtime-generated data files used by BeskarFolio.
 - **Format**: CSV files named `{TICKER}_prices.csv`
 - **Source**: yfinance daily candles (runs outside Docker on host machine)
 - **Invariant**: Exactly one `Date,Close` row per market day
-- **Git**: Ignored (too large, generated data)
+- **Git**: Demo tickers (`AAPL`, `MSFT`, `GOOGL`, `VWCE.DE`, `SXR8.DE`) are tracked so the "Load Demo Data" button works on fresh clones and the public demo without burning price-provider API limits. All other tickers are gitignored runtime data.
 
 ## Automated Updates
 

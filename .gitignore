@@ -51,7 +51,14 @@ NOTES.md
 # Backend data (generated at runtime / personal portfolio data)
 backend/data/*.db
 backend/data/raw/ibkr_*.txt
-backend/data/historical_prices/
+# Personal portfolio price history is local-only; demo tickers below are tracked
+# so the "Load Demo Data" button works on fresh clones / public demos.
+backend/data/historical_prices/*
+!backend/data/historical_prices/AAPL_prices.csv
+!backend/data/historical_prices/MSFT_prices.csv
+!backend/data/historical_prices/GOOGL_prices.csv
+!backend/data/historical_prices/VWCE_DE_prices.csv
+!backend/data/historical_prices/SXR8_DE_prices.csv
 backend/data/exchange_rates.json
 backend/data/latest_prices.json
 
