@@ -21,7 +21,6 @@ export const priceService = {
     try {
       const response = await api.get<LatestPrices>('/api/prices/latest', {
         params: { _ts: Date.now() },
-        headers: { 'Cache-Control': 'no-store' },
       })
       return response.data
     } catch (error) {
@@ -38,7 +37,6 @@ export const priceService = {
     try {
       const response = await api.get('/api/prices/status', {
         params: { _ts: Date.now() },
-        headers: { 'Cache-Control': 'no-store' },
       })
       return response.data
     } catch (error) {
