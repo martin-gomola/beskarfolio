@@ -196,9 +196,9 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
         </div>
       </div>
 
-      {/* Metrics Grid - single grid so all tiles share column tracks */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* Total Value */}
+      {/* Metrics Grid — left column (amounts) wider, right column (%) narrower */}
+      <div className="grid grid-cols-[7fr_3fr] gap-3">
+        {/* Row 1: Value | Return */}
         <div className="glass rounded-xl p-4">
           <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -213,33 +213,6 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
           </div>
         </div>
 
-        {/* Total Invested */}
-        <div className="glass rounded-xl p-4">
-          <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M19 12l-7 7-7-7"/>
-            </svg>
-            Invested
-          </div>
-          <div className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
-            {isPrivate ? PRIVACY_MASK : `€${formatNumber(summary.total_invested)}`}
-          </div>
-        </div>
-
-        {/* Unrealized P&L */}
-        <div className="glass rounded-xl p-4">
-          <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-            P&L
-          </div>
-          <div className={`text-2xl sm:text-3xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : returnColor}`}>
-            {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}
-          </div>
-        </div>
-
-        {/* Return % */}
         <div className="glass rounded-xl p-4">
           <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -252,7 +225,19 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
           </div>
         </div>
 
-        {/* Avg Annual Return */}
+        {/* Row 2: Invested | Avg Annual */}
+        <div className="glass rounded-xl p-4">
+          <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M19 12l-7 7-7-7"/>
+            </svg>
+            Invested
+          </div>
+          <div className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+            {isPrivate ? PRIVACY_MASK : `€${formatNumber(summary.total_invested)}`}
+          </div>
+        </div>
+
         <div className="glass rounded-xl p-4">
           <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-wider mb-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -279,7 +264,19 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
           )}
         </div>
 
-        {/* YTD */}
+        {/* Row 3: P&L | YTD */}
+        <div className="glass rounded-xl p-4">
+          <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            P&L
+          </div>
+          <div className={`text-2xl sm:text-3xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : returnColor}`}>
+            {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}
+          </div>
+        </div>
+
         <div className="glass rounded-xl p-4">
           <div className="flex items-center gap-2 text-xs text-gray-400 uppercase tracking-wider mb-2">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
