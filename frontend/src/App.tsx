@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 
 // Services
-import { priceService } from './services'
+import { api, priceService } from './services'
 
 // Hooks
 import {
@@ -450,15 +450,13 @@ const App: React.FC = () => {
                       onClick={async () => {
                         if (!confirm('Load demo portfolio (~€15k, 5 holdings) to try the app?')) return
                         try {
-                          // Clear all caches first
                           clearAllCaches()
-                          
-                          const response = await fetch('/api/import/demo?mode=replace', { method: 'POST' })
-                          const data = await response.json()
+
+                          const { data } = await api.post('/api/import/demo?mode=replace')
                           if (data.success && data.transactions) {
                             const transactions = data.transactions.map((txn: any, i: number) => ({
                               ...txn,
-                              id: `demo-${txn.date}-${txn.ticker}-${i}`,  // Unique ID
+                              id: `demo-${txn.date}-${txn.ticker}-${i}`,
                               total_value: txn.shares * txn.price
                             }))
                             localStorage.setItem('beskarfolio_guest_transactions', JSON.stringify(transactions))
@@ -467,6 +465,7 @@ const App: React.FC = () => {
                             handleDataUpdate()
                           }
                         } catch (e) {
+                          console.error('Demo import error:', e)
                           alert('Failed to load demo')
                         }
                       }}

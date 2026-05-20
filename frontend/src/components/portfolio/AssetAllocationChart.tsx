@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Holding } from '../../types'
 import { CHART_COLORS } from '../../utils/constants'
+import { api } from '../../services'
 import { usePrivacyMode } from '../../hooks'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
 
@@ -267,20 +268,9 @@ export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({ hold
       if (missingTickers.length === 0) return
       
       try {
-        // Fetch missing profiles in batch
-        const response = await fetch('/api/tickers/profiles/batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(missingTickers)
-        })
-        
-        if (!response.ok) {
-          console.warn('Failed to fetch ticker profiles:', response.status)
-          return
-        }
-        
-        const data = await response.json()
-        
+        const response = await api.post('/api/tickers/profiles/batch', missingTickers)
+        const data = response.data
+
         if (data.success && data.profiles) {
           // Merge with existing cache
           const updatedCache = { ...cache }
