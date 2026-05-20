@@ -53,7 +53,13 @@ test_*.py
 # Data directories (keep structure but exclude large files)
 data/raw/*.csv
 data/processed/*.csv
+# Demo CSVs ship with the image so the public demo and fresh clones work
+# zero-API-calls. Match the policy in .gitignore.
 data/historical_prices/*.csv
+!data/historical_prices/AAPL_prices.csv
+!data/historical_prices/MSFT_prices.csv
+!data/historical_prices/GOOGL_prices.csv
+!data/historical_prices/VWCE_DE_prices.csv
 !data/historical_prices/SXR8_DE_prices.csv
 !data/ticker/historical/SXR8_DE_historical.csv
 data/exports/*.csv
