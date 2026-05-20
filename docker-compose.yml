@@ -45,6 +45,8 @@ services:
     container_name: beskarfolio-web
     ports:
       - "${FRONTEND_PORT:-8080}:80"
+    environment:
+      - ANALYTICS_SCRIPT=${ANALYTICS_SCRIPT:-}
     depends_on:
       backend:
         condition: service_healthy
