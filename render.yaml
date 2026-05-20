@@ -21,7 +21,6 @@ services:
     name: beskarfolio-web
     runtime: static
     plan: free
-    region: frankfurt
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
