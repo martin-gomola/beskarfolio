@@ -197,7 +197,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
       </div>
 
       {/* Metrics Grid — left column (amounts) wider, right column (%) narrower */}
-      <div className="grid grid-cols-[7fr_3fr] gap-3">
+      <div className="grid grid-cols-[3fr_2fr] gap-3">
         {/* Row 1: Value | Return */}
         <div className="glass rounded-xl p-4">
           <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
