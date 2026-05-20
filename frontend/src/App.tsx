@@ -17,7 +17,7 @@ import { clearAllCaches, updateTransactionsHash } from './utils/guestCache'
 
 // Common Components (always loaded - small)
 import { LocalStorageBanner } from './components/common/LocalStorageBanner'
-import { DashboardSkeleton, BackupDropdown } from './components/common'
+import { DashboardSkeleton, BackupDropdown, BackendWakingOverlay } from './components/common'
 import { ToolsMenu } from './components/tools/ToolsMenu'
 
 // Dashboard Components (always loaded - main view)
@@ -263,6 +263,7 @@ const App: React.FC = () => {
   if (loading) {
     return (
       <PrivacyProvider>
+        <BackendWakingOverlay />
         <div className="min-h-screen">
           {/* Header Skeleton */}
           <header className="glass-nav border-b border-white/[0.06] sticky top-0 z-30">
@@ -285,6 +286,7 @@ const App: React.FC = () => {
 
   return (
     <PrivacyProvider>
+    <BackendWakingOverlay />
     <div className="min-h-screen">
       {/* Pull-to-refresh indicator (mobile only) */}
       {(isPulling || isRefreshing) && (

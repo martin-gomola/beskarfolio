@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { priceService } from '../services'
 import { PriceStatus } from '../types'
+import { IS_DEMO_MODE } from '../utils/constants'
 
 const AUTO_REFRESH_MS = 30 * 60 * 1000 // 30 minutes
 const STATUS_POLL_MS = 5 * 60 * 1000 // 5 minutes
@@ -37,9 +38,11 @@ export const usePriceStatus = () => {
     window.addEventListener('focus', handleVisibilityOrFocus)
     document.addEventListener('visibilitychange', handleVisibilityOrFocus)
 
-    intervalRef.current = setInterval(() => {
-      window.dispatchEvent(new Event('auto-refresh-prices'))
-    }, AUTO_REFRESH_MS)
+    if (!IS_DEMO_MODE) {
+      intervalRef.current = setInterval(() => {
+        window.dispatchEvent(new Event('auto-refresh-prices'))
+      }, AUTO_REFRESH_MS)
+    }
     statusPollRef.current = setInterval(() => {
       fetchPriceStatus()
     }, STATUS_POLL_MS)

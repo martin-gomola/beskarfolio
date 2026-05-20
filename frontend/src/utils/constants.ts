@@ -24,6 +24,11 @@ const getApiBaseUrl = (): string => {
 export const API_BASE_URL = getApiBaseUrl()
 export const API_TIMEOUT = 120000 // 2 minutes for complex operations (imports, annual report)
 
+// Demo Mode (Render public demo)
+// When true, disables silent auto-refresh so visitor traffic doesn't burn
+// the shared Twelve Data quota. Users can still trigger refresh manually.
+export const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
+
 // Storage Keys
 export const GUEST_STORAGE_KEY = 'beskarfolio_guest_transactions'
 export const GUEST_PRICES_KEY = 'beskarfolio_guest_prices'

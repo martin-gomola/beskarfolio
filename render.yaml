@@ -15,6 +15,9 @@ services:
         value: beskarfolio-api.onrender.com
       - key: LOG_LEVEL
         value: INFO
+      # Set the value in the Render dashboard; sync: false keeps it out of git
+      - key: TWELVE_DATA_API_KEY
+        sync: false
 
   - type: web
     name: beskarfolio
@@ -25,6 +28,10 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://beskarfolio-api.onrender.com
+      # Disables silent 30-min auto-refresh so visitor traffic doesn't burn
+      # the Twelve Data quota. Manual "Update Prices" button still works.
+      - key: VITE_DEMO_MODE
+        value: "true"
     routes:
       - type: rewrite
         source: /*
