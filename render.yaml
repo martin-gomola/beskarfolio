@@ -2,7 +2,6 @@ services:
   - type: web
     name: beskarfolio-api
     runtime: docker
-    plan: free
     region: frankfurt
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -20,7 +19,6 @@ services:
   - type: web
     name: beskarfolio-web
     runtime: static
-    plan: free
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
