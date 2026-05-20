@@ -10,14 +10,14 @@ services:
       - key: PRICE_PROVIDER
         value: auto
       - key: CORS_ORIGINS
-        value: https://beskarfolio-web.onrender.com
+        value: https://beskarfolio.onrender.com
       - key: TRUSTED_HOSTS
         value: beskarfolio-api.onrender.com
       - key: LOG_LEVEL
         value: INFO
 
   - type: web
-    name: beskarfolio-web
+    name: beskarfolio
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build

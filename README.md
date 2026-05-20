@@ -2,7 +2,7 @@
 
 Personal stock portfolio tracker built with FastAPI and React. Your data lives in your browser. The backend fetches prices and runs math. Nothing else.
 
-**[Live demo](https://beskarfolio-web.onrender.com)** -- runs on Render free tier, first request may take 30s to wake.
+**[Live demo](https://beskarfolio.onrender.com)** -- runs on Render free tier, first request may take 30s to wake.
 
 <p align="center">
   <img src="docs/screenshot-mobile.png" alt="Dashboard" width="240" />
