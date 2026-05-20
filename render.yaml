@@ -2,7 +2,7 @@ services:
   - type: web
     name: beskarfolio-api
     runtime: docker
-    region: frankfurt
+    region: oregon
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
