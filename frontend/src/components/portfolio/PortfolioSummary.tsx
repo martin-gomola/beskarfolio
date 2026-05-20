@@ -244,7 +244,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
               <path d="M3 3v18h18" />
               <path d="M7 14l4-4 3 3 5-6" />
             </svg>
-            Avg Annual
+            Annual
             {!perfLoading && avgAnnualPct !== null && completedYearCount > 0 && (
               <span className="text-gray-500 normal-case tracking-normal">({completedYearCount}y)</span>
             )}
