@@ -10,6 +10,12 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # Match container's appuser uid/gid to the host user that owns
+      # backend/data on disk (typically the user running the daily cron).
+      # Without this, the container cannot overwrite latest_prices.json
+      # and "Update Prices" silently no-ops.
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       # Security (set in config/.env)
       - BESKARFOLIO_API_KEY=${BESKARFOLIO_API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:${FRONTEND_PORT:-8080}}

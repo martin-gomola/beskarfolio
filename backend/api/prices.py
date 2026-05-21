@@ -35,7 +35,7 @@ from logic.prices.service import (
     get_latest_price,
     update_all_prices,
 )
-from logic.prices.storage import CSVStorageManager, list_historical_tickers
+from logic.prices.storage import CSVStorageManager, PricePersistenceError, list_historical_tickers
 # Currency rates are returned by get_exchange_rates endpoint
 
 logger = logging.getLogger(__name__)
@@ -395,10 +395,26 @@ async def update_prices(request: Request, price_request: PriceUpdateRequest = No
                 for ticker in tickers_to_fetch:
                     price = result.get(ticker)
                     if price:
-                        CSVStorageManager.save_latest_snapshot(
-                            ticker, price, source="api",
-                            market_date=get_market_date_for_ticker(ticker),
-                        )
+                        try:
+                            CSVStorageManager.save_latest_snapshot(
+                                ticker, price, source="api",
+                                market_date=get_market_date_for_ticker(ticker),
+                            )
+                        except PricePersistenceError as exc:
+                            # Server-side filesystem misconfiguration (most often a
+                            # container user that cannot write the bind-mounted data
+                            # volume). Bail loudly so the UI doesn't claim success
+                            # while the snapshot stays stuck at yesterday's value.
+                            logger.error(
+                                f"Persistence failed during /api/prices/update for {ticker}: {exc}"
+                            )
+                            raise HTTPException(
+                                status_code=503,
+                                detail=(
+                                    "Fetched fresh prices from API but could not persist them "
+                                    f"to disk: {exc}"
+                                ),
+                            ) from exc
                         updated_count += 1
                         ticker_results.append({
                             "ticker": ticker,
@@ -434,7 +450,16 @@ async def update_prices(request: Request, price_request: PriceUpdateRequest = No
                 try:
                     if finalize_daily_close(ticker):
                         close_count += 1
+                except PricePersistenceError as exc:
+                    logger.error(
+                        f"Persistence failed during finalize_daily_close for {ticker}: {exc}"
+                    )
+                    raise HTTPException(
+                        status_code=503,
+                        detail=f"Could not persist daily close to disk: {exc}",
+                    ) from exc
                 except Exception as exc:
+                    # yfinance flakiness, network blips, etc. — non-fatal.
                     logger.debug(f"finalize_daily_close failed for {ticker}: {exc}")
 
             return {
@@ -451,6 +476,9 @@ async def update_prices(request: Request, price_request: PriceUpdateRequest = No
 
         return update_all_prices(force_refresh=force_refresh)
 
+    except HTTPException:
+        # Re-raise so FastAPI returns the structured status/detail we set above.
+        raise
     except Exception as e:
         raise_unexpected_error(logger, "Error updating prices", e, str(e))
 

@@ -20,6 +20,15 @@ from logic.prices.shared import (
 )
 
 
+class PricePersistenceError(RuntimeError):
+    """Raised when price data could not be written to disk.
+
+    Distinct from generic OSError so API layers can catch only persistence
+    failures and surface them to the user as "updated in memory but not
+    saved" rather than crashing the request.
+    """
+
+
 class CSVStorageManager:
     """
     Manages historical price CSV files with mtime-based caching.
@@ -117,7 +126,12 @@ class CSVStorageManager:
                 json.dump(payload, handle, indent=2, sort_keys=True)
                 handle.write("\n")
         except OSError as exc:
-            logger.error(f"Error saving latest price snapshots: {exc}")
+            logger.error(f"Error saving latest price snapshots to {snapshot_file}: {exc}")
+            raise PricePersistenceError(
+                f"Could not write {snapshot_file}: {exc}. "
+                "Check that the container user can write to the data volume "
+                "(see PUID/PGID in docker-compose.yml)."
+            ) from exc
 
     @staticmethod
     def save_latest_snapshot(
@@ -233,6 +247,12 @@ class CSVStorageManager:
                 handle.write(f"{date_str},{price:.2f}\n")
             logger.info(f"💾 Created {ticker}: ${price:.2f} ({date_str})")
             CSVStorageManager.invalidate_cache(ticker)
+        except OSError as exc:
+            logger.error(f"Error writing CSV for {ticker} ({csv_file}): {exc}")
+            raise PricePersistenceError(
+                f"Could not write {csv_file}: {exc}. "
+                "Check that the container user can write to the data volume."
+            ) from exc
         except Exception as e:
             logger.error(f"Error saving price for {ticker}: {e}")
 

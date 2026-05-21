@@ -67,6 +67,21 @@ cp config/env.example config/.env   # Add your API keys
 make deploy                          # Build and start containers
 ```
 
+**Filesystem ownership.** The container reconciles its `appuser` to the
+host owner of `backend/data` at startup via the entrypoint script. If you
+run the daily price cron as a different user (or your host uid is not
+`1000`), set `PUID` and `PGID` in `config/.env` to match the host owner of
+`backend/data/` — otherwise in-container writes (the "Update Prices"
+button) will silently no-op while the cron still works.
+
+```bash
+# in config/.env, if your host user isn't uid 1000
+PUID=1001
+PGID=1001
+```
+
+Verify with `stat -c '%u:%g' backend/data/` on the host.
+
 Free tier API keys cover a personal portfolio:
 
 | Provider | Free Tier | Coverage |

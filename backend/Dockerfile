@@ -27,19 +27,32 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 WORKDIR /app
 
-# Create non-root user and writable app directories before copying code.
-RUN groupadd -r appgroup && \
-    useradd -r -g appgroup appuser && \
+# Install gosu so the entrypoint can drop from root to the runtime user
+# after fixing uid/gid. Static gosu is ~2MB and avoids the much heavier
+# sudo + PAM dependency chain.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gosu && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create a runtime user/group with placeholder uid/gid 1000:1000. The
+# entrypoint will rewrite these to match PUID/PGID at startup so writes
+# to the bind-mounted /app/data volume keep the host's ownership.
+RUN groupadd -g 1000 appgroup && \
+    useradd -u 1000 -g appgroup -m -s /bin/bash appuser && \
     mkdir -p /app/logs /app/config /app/data
 
 # Copy virtual environment and application code
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=appuser:appgroup . .
 
+# Make the entrypoint executable while we're still root.
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Keep only runtime-writable directories group-writable.
 RUN chmod -R 775 /app/logs /app/config /app/data
 
-USER appuser
+# NOTE: deliberately stay as root here. The entrypoint reconciles PUID/PGID
+# and then `gosu`'s into appuser before exec'ing uvicorn.
 
 EXPOSE 8060
 
@@ -47,4 +60,5 @@ EXPOSE 8060
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8060/health', timeout=5)"
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8060"]

@@ -22,7 +22,13 @@ type RetryConfig = AxiosRequestConfig & { _retryCount?: number; _retryStartedAt?
 const isRetryable = (error: AxiosError): boolean => {
   if (error.config?.url?.includes('/health')) return false
   if (!error.response) return error.code !== 'ECONNABORTED'
-  return RETRYABLE_STATUSES.has(error.response.status)
+  if (!RETRYABLE_STATUSES.has(error.response.status)) return false
+  // A structured "detail" body means the server (FastAPI) deliberately
+  // returned this status — e.g. a permission/persistence error from
+  // /api/prices/update. Retrying that is pointless; surface it immediately.
+  const data = error.response.data as { detail?: unknown } | undefined
+  if (data && typeof data.detail === 'string') return false
+  return true
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

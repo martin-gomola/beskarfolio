@@ -436,7 +436,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onDataCleared }) => 
         window.dispatchEvent(new Event('prices-updated'))
       } catch (err: any) {
         terminal.addLine('')
-        terminal.addLine(`✗ ERROR: ${err.message || 'Failed'}`, 'error')
+        const detail = err?.response?.data?.detail
+        const status = err?.response?.status
+        if (status === 503 && typeof detail === 'string') {
+          terminal.addLine('✗ Server could not persist prices', 'error')
+          terminal.addLine(`  ${detail}`, 'error')
+        } else {
+          terminal.addLine(`✗ ERROR: ${err.message || 'Failed'}`, 'error')
+        }
       }
 
       await terminal.sleep(400)
