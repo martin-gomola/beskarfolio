@@ -154,8 +154,11 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
           <p className="text-sm text-gray-500 mt-0.5">
             {summary.holdings_count} holdings · {summary.transaction_count} transactions
             {priceStatus && priceStatus.has_prices && (
-              <span className="ml-2 inline-flex items-center gap-1">
-                · Prices: <span className={`inline-block w-2 h-2 rounded-full ${priceIndicator.dotClass}`} aria-hidden="true" /><span className={priceInfo.color}>{priceIndicator.label}</span>
+              <span className="mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex">
+                <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>
+                Prices:
+                <span className={`inline-block w-2 h-2 rounded-full ${priceIndicator.dotClass}`} aria-hidden="true" />
+                <span className={priceInfo.color}>{priceIndicator.label}</span>
               </span>
             )}
           </p>
