@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   ArrowLeft,
   Bot,
@@ -8,11 +8,12 @@ import {
   Inbox,
   User as UserIcon,
 } from 'lucide-react'
-import { Holding, PortfolioSummary, TaxFreeHolding } from '../../types'
+import { Holding, PortfolioSummary, TaxFreeHolding, Transaction } from '../../types'
 import { usePortfolioContext } from './hooks/usePortfolioContext'
 import { ALL_PROMPTS, PROMPTS_BY_ID, PromptType } from './prompts'
 import { loadAISettings } from '../../utils/aiSettings'
 import { taxService } from '../../services/taxService'
+import { transactionService } from '../../services/transactionService'
 
 interface AIAnalysisPageProps {
   holdings: Holding[]
@@ -31,6 +32,9 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState<string | null>(null)
   const [taxFreeData, setTaxFreeData] = useState<TaxFreeHolding[] | null>(null)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [selectedTicker, setSelectedTicker] = useState('')
+  const [replacementTicker, setReplacementTicker] = useState('')
 
   const settings = loadAISettings()
 
@@ -40,7 +44,53 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
     }
   }, [holdings.length])
 
-  const { promptContext } = usePortfolioContext(holdings, summary, settings, taxFreeData)
+  const loadTransactions = useCallback(async () => {
+    try {
+      const data = await transactionService.getAll()
+      setTransactions(data)
+    } catch {
+      setTransactions([])
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadTransactions()
+
+    const handleTransactionsUpdated = () => {
+      void loadTransactions()
+    }
+
+    window.addEventListener('guestTransactionsUpdated', handleTransactionsUpdated)
+    window.addEventListener('storage', handleTransactionsUpdated)
+
+    return () => {
+      window.removeEventListener('guestTransactionsUpdated', handleTransactionsUpdated)
+      window.removeEventListener('storage', handleTransactionsUpdated)
+    }
+  }, [loadTransactions])
+
+  const tickerOptions = useMemo(() => {
+    const tickers = new Set<string>()
+    holdings.forEach(h => tickers.add(h.ticker))
+    transactions.forEach(t => tickers.add(t.ticker))
+    return Array.from(tickers).sort()
+  }, [holdings, transactions])
+
+  useEffect(() => {
+    if (tickerOptions.length > 0 && !tickerOptions.includes(selectedTicker)) {
+      setSelectedTicker(tickerOptions[0])
+    }
+  }, [tickerOptions, selectedTicker])
+
+  const { promptContext } = usePortfolioContext(
+    holdings,
+    summary,
+    settings,
+    taxFreeData,
+    transactions,
+    selectedTicker,
+    replacementTicker
+  )
 
   const prompt = selectedPrompt && promptContext
     ? PROMPTS_BY_ID[selectedPrompt].generate(promptContext)
@@ -90,6 +140,8 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
 
   // Question Selected - Show terminal prompt and copy button
   if (selectedPrompt) {
+    const isTaxBacktestPrompt = selectedPrompt === 'taxBacktest'
+
     return (
       <div className="p-4 sm:p-6 space-y-6">
         {/* Header - Compact horizontal layout */}
@@ -111,6 +163,33 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
             </h2>
           </div>
         </div>
+
+        {isTaxBacktestPrompt && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Ticker</span>
+              <select
+                value={selectedTicker}
+                onChange={(event) => setSelectedTicker(event.target.value)}
+                className="w-full rounded-lg border border-white/10 bg-surface-elevated px-3 py-2.5 text-sm text-white outline-none transition-colors focus:border-accent-400"
+              >
+                {tickerOptions.map(ticker => (
+                  <option key={ticker} value={ticker}>{ticker}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-wide text-gray-500">Backtest Against</span>
+              <input
+                value={replacementTicker}
+                onChange={(event) => setReplacementTicker(event.target.value.toUpperCase())}
+                placeholder="Optional ticker"
+                className="w-full rounded-lg border border-white/10 bg-surface-elevated px-3 py-2.5 text-sm text-white placeholder:text-gray-600 outline-none transition-colors focus:border-accent-400"
+              />
+            </label>
+          </div>
+        )}
 
         {/* Terminal Window - Prompt Preview */}
         <div className="bg-surface-dark rounded-xl border border-white/10 overflow-hidden font-mono text-sm">

@@ -1,4 +1,5 @@
 import { LucideIcon } from 'lucide-react'
+import { Transaction } from '../../../types'
 import { InvestorProfile, PortfolioHolding } from '../types'
 
 // Context passed to each prompt generator
@@ -21,6 +22,14 @@ export interface PromptContext {
   // Tax-free data (Slovak 365-day rule)
   taxFreeSection: string
   hasTaxFreeData: boolean
+
+  // Selected ticker transaction context
+  transactions: Transaction[]
+  selectedTicker: string
+  replacementTicker: string
+  selectedTickerTransactions: Transaction[]
+  selectedTickerHolding?: PortfolioHolding
+  selectedTickerTaxFreeSection: string
 
   // Pre-built base context string
   baseContext: string
@@ -47,3 +56,4 @@ export type PromptType =
   | 'rebalance'
   | 'dividends'
   | 'buffett'
+  | 'taxBacktest'

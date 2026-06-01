@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Holding, PortfolioSummary, TaxFreeHolding } from '../../../types'
+import { Holding, PortfolioSummary, TaxFreeHolding, Transaction } from '../../../types'
 import { TickerInfo, AISettings, PortfolioHolding, TICKER_INFO_CACHE_KEY } from '../types'
 import { TICKER_SECTORS, ETF_PATTERNS, HORIZON_LABELS, GOAL_LABELS } from '../constants'
 import { PromptContext } from '../prompts/types'
@@ -46,7 +46,10 @@ export function usePortfolioContext(
   holdings: Holding[],
   summary: PortfolioSummary | null,
   settings: AISettings,
-  taxFreeData?: TaxFreeHolding[] | null
+  taxFreeData?: TaxFreeHolding[] | null,
+  transactions: Transaction[] = [],
+  selectedTicker = '',
+  replacementTicker = ''
 ): { portfolioData: PortfolioHolding[] | null; promptContext: PromptContext | null } {
 
   const portfolioData = useMemo(() => {
@@ -118,6 +121,16 @@ ${profile?.goal ? `- **Primary Goal:** ${GOAL_LABELS[profile.goal]}` : ''}
 
     const hasTaxFreeData = !!(taxFreeData && taxFreeData.length > 0)
     const taxFreeSection = hasTaxFreeData ? buildTaxFreeSection(taxFreeData!) : ''
+    const normalizedSelectedTicker = selectedTicker.toUpperCase()
+    const normalizedReplacementTicker = replacementTicker.trim().toUpperCase()
+    const selectedTickerTransactions = transactions
+      .filter(t => t.ticker.toUpperCase() === normalizedSelectedTicker)
+      .sort((a, b) => a.date.localeCompare(b.date))
+    const selectedTickerHolding = portfolioData.find(h => h.ticker.toUpperCase() === normalizedSelectedTicker)
+    const selectedTickerTaxFree = taxFreeData?.find(t => t.ticker.toUpperCase() === normalizedSelectedTicker)
+    const selectedTickerTaxFreeSection = selectedTickerTaxFree
+      ? buildTaxFreeSection([selectedTickerTaxFree])
+      : ''
 
     const baseContext = `
 ## My Portfolio
@@ -151,9 +164,15 @@ ${hasTaxFreeData ? `\n${taxFreeSection}` : ''}
       profileSection,
       taxFreeSection,
       hasTaxFreeData,
+      transactions,
+      selectedTicker: normalizedSelectedTicker,
+      replacementTicker: normalizedReplacementTicker,
+      selectedTickerTransactions,
+      selectedTickerHolding,
+      selectedTickerTaxFreeSection,
       baseContext,
     }
-  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData])
+  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData, transactions, selectedTicker, replacementTicker])
 
   return { portfolioData, promptContext }
 }
