@@ -21,7 +21,7 @@ from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from config.settings import APP_VERSION
-from api import routes, admin, transactions, portfolio, prices, analytics, imports as import_routes, allocation
+from api import routes, admin, transactions, portfolio, prices, analytics, imports as import_routes, allocation, webmcp
 
 # Rate limiter configuration
 # Uses client IP for rate limiting (works behind reverse proxy with X-Forwarded-For)
@@ -123,8 +123,17 @@ async def security_middleware(request: Request, call_next):
     - Requires API key for external requests (if API_KEY is configured)
     - Always allows health check endpoint
     """
-    # Always allow health check (for monitoring)
-    if request.url.path in ["/health", "/", "/docs", "/openapi.json"]:
+    # Always allow health check (for monitoring) and public discovery docs.
+    # WebMCP/A2A manifests are intentionally public + CORS-open: they describe
+    # only read-only endpoints and are fetched cross-origin by AI agents.
+    if request.url.path in [
+        "/health",
+        "/",
+        "/docs",
+        "/openapi.json",
+        "/.well-known/webmcp",
+        "/.well-known/agent.json",
+    ]:
         return await call_next(request)
     
     # Check if request is from a trusted host (same-origin)
@@ -177,6 +186,7 @@ app.include_router(analytics.router)  # Analytics (annual, tax-free, performance
 app.include_router(import_routes.router)  # Import endpoints (IBKR, demo)
 app.include_router(allocation.router)  # Allocation & rebalancing
 app.include_router(admin.router)  # Admin logs
+app.include_router(webmcp.router)  # WebMCP / A2A discovery manifests
 
 if __name__ == "__main__":
     import uvicorn

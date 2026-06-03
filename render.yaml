@@ -37,6 +37,15 @@ services:
       - key: ANALYTICS_SCRIPT
         sync: false
     routes:
+      # Proxy WebMCP / A2A discovery docs to the backend so agents can find
+      # them on the site origin (beskarfolio.onrender.com/.well-known/*).
+      # Must precede the SPA catch-all below (first match wins).
+      - type: rewrite
+        source: /.well-known/webmcp
+        destination: https://beskarfolio-api.onrender.com/.well-known/webmcp
+      - type: rewrite
+        source: /.well-known/agent.json
+        destination: https://beskarfolio-api.onrender.com/.well-known/agent.json
       - type: rewrite
         source: /*
         destination: /index.html

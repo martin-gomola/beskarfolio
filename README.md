@@ -133,6 +133,13 @@ frontend/
 └── utils/        # Formatters, storage, validators
 ```
 
+## AI-agent access (MCP)
+
+BeskarFolio exposes its public, **read-only** price/calculation endpoints to AI agents two ways:
+
+- **Local MCP server** (`mcp-server/`) — works **today** with Codex, Cursor, and Claude Desktop. A thin stdio server wraps four read-only tools (`get_latest_prices`, `get_price_status`, `get_exchange_rates`, `get_ticker_profile`) over the live API. See [`mcp-server/README.md`](mcp-server/README.md) for setup. Nothing writes data or triggers paid fetches.
+- **Discovery manifest** — `GET /.well-known/webmcp` ([WebMCP](https://www.freecodecamp.org/news/a-developers-guide-to-webmcp/), a W3C draft) and `/.well-known/agent.json` (A2A AgentCard) declare the same tools for in-browser agents. Served CORS-open; on the Render split deploy the static site proxies `/.well-known/*` to the API. Forward-looking (browser support ~2027); the local MCP server is the part with real value now.
+
 ## Troubleshooting
 
 | Symptom | Fix |

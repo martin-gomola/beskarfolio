@@ -73,8 +73,10 @@ backend/data/latest_prices.json
 
 # Local dev tools
 bruno/
-mcp-server/
 test-screenshots/
+
+# MCP server source is tracked; its local venv is not.
+mcp-server/.venv/
 
 # Documentation (internal notes)
 GEMINI.md
