@@ -135,10 +135,13 @@ frontend/
 
 ## AI-agent access (MCP)
 
-BeskarFolio exposes its public, **read-only** price/calculation endpoints to AI agents two ways:
+BeskarFolio exposes **read-only** tools to AI agents three ways:
 
-- **Local MCP server** (`mcp-server/`) — works **today** with Codex, Cursor, and Claude Desktop. A thin stdio server wraps four read-only tools (`get_latest_prices`, `get_price_status`, `get_exchange_rates`, `get_ticker_profile`) over the live API. See [`mcp-server/README.md`](mcp-server/README.md) for setup. Nothing writes data or triggers paid fetches.
-- **Discovery manifest** — `GET /.well-known/webmcp` ([WebMCP](https://www.freecodecamp.org/news/a-developers-guide-to-webmcp/), a W3C draft) and `/.well-known/agent.json` (A2A AgentCard) declare the same tools for in-browser agents. Served CORS-open; on the Render split deploy the static site proxies `/.well-known/*` to the API. Forward-looking (browser support ~2027); the local MCP server is the part with real value now.
+- **Local MCP server** (`mcp-server/`) — works **today** with Codex, Cursor, and Claude Desktop. A thin stdio server wraps four read-only tools (`get_latest_prices`, `get_price_status`, `get_exchange_rates`, `get_ticker_profile`) over the live API. See [`mcp-server/README.md`](mcp-server/README.md) for setup.
+- **In-browser WebMCP tools** (`frontend/src/utils/webmcp.ts`) — registers `get_portfolio_summary`, `get_holdings`, `get_app_context` via `navigator.modelContext.registerTool()`. These read *this browser's* localStorage portfolio — something the server-side tools can't. Feature-detected, no-ops where unsupported. Test it in Chrome 146+ with `chrome://flags/#enable-webmcp-testing` enabled and the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd) extension.
+- **Discovery manifest** — `GET /.well-known/webmcp` and `/.well-known/agent.json` (A2A AgentCard) declare the server-side tools. Served CORS-open; on the Render split deploy the static site proxies `/.well-known/*` to the API.
+
+Everything is read-only: no tool writes data or triggers paid price fetches. WebMCP browser support is still flag-gated/early; the local MCP server is the part with real value now.
 
 ## Troubleshooting
 

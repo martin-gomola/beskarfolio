@@ -2,7 +2,12 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import { ErrorBoundary, ToastProvider } from './components/common'
+import { initWebMCP } from './utils/webmcp'
 import './index.css'
+
+// Register WebMCP read-only tools for in-browser AI agents (Chrome 146+ with
+// chrome://flags/#enable-webmcp-testing). Feature-detected; no-ops elsewhere.
+initWebMCP()
 
 // In dev, public/sw.js still contains unresolved build-time placeholders
 // (__PRECACHE_URLS__, __BUILD_VERSION__) which would crash the SW and can
