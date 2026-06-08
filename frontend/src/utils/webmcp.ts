@@ -125,6 +125,54 @@ function buildTools(): ToolDefinition[] {
       },
     },
     {
+      name: 'get_transactions',
+      description:
+        "List the current visitor's individual buy/sell/dividend transactions, " +
+        'most recent first. Each item has ticker, type, date, shares, price, ' +
+        'currency, and total_value. Use this to answer questions like "what was ' +
+        'my latest purchase?". Pass a ticker to filter and limit to cap results ' +
+        "(default 20). Reads from this browser's localStorage.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ticker: {
+            type: 'string',
+            description: 'Optional. Filter to a single ticker, e.g. AAPL.',
+          },
+          limit: {
+            type: 'number',
+            description: 'Optional. Max transactions to return (default 20).',
+          },
+        },
+      },
+      execute: async (args) => {
+        const transactions = loadGuestTransactions()
+        const ticker = typeof args.ticker === 'string' ? args.ticker.toUpperCase().trim() : ''
+        const limit =
+          typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 20
+
+        const sorted = [...transactions]
+          .filter((t) => !ticker || t.ticker.toUpperCase() === ticker)
+          // Most recent first: by trade date, then creation time as a tiebreaker.
+          .sort((a, b) => {
+            if (a.date !== b.date) return a.date < b.date ? 1 : -1
+            return (a.created_at || '') < (b.created_at || '') ? 1 : -1
+          })
+          .slice(0, limit)
+          .map((t) => ({
+            ticker: t.ticker,
+            type: t.type,
+            date: t.date,
+            shares: t.shares,
+            price: t.price,
+            currency: t.currency,
+            total_value: t.total_value,
+          }))
+
+        return jsonResult(sorted)
+      },
+    },
+    {
       name: 'get_app_context',
       description:
         'Get structured context about BeskarFolio: what it does, how data is ' +
