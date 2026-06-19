@@ -1,15 +1,21 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="bf-title bf-desc">
   <title id="bf-title">BeskarFolio</title>
-  <desc id="bf-desc">Shield with upward trend arrow — portfolio protection and growth.</desc>
+  <desc id="bf-desc">Portfolio allocation mark with core holdings and a steady upward signal.</desc>
   <defs>
-    <linearGradient id="shield-grad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="100%" stop-color="#10b981"/>
+    <linearGradient id="bg" x1="8" y1="5" x2="56" y2="61" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#18382d"/>
+      <stop offset="1" stop-color="#07110d"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="14" fill="#0a0f0d"/>
-  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" stroke="white" stroke-opacity="0.06" stroke-width="1.5"/>
-  <path d="M32 10L12 19v13c0 12.5 8.5 23.5 20 27 11.5-3.5 20-14.5 20-27V19L32 10z" fill="none" stroke="url(#shield-grad)" stroke-width="3.5" stroke-linejoin="round"/>
-  <path d="M20 38l8-8 6 6 11-12" fill="none" stroke="url(#shield-grad)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M39 24h7v7" fill="none" stroke="url(#shield-grad)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="64" height="64" rx="15" fill="#07110d"/>
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="url(#bg)" stroke="#ffffff" stroke-opacity="0.09" stroke-width="2"/>
+
+  <path d="M32 10 51 21v22L32 54 13 43V21L32 10Z" fill="#091611" stroke="#365845" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M32 16.3 45.5 24.1V39.8L32 47.7 18.5 39.8V24.1L32 16.3Z" fill="#10241c" stroke="#1ea673" stroke-opacity="0.72" stroke-width="2" stroke-linejoin="round"/>
+
+  <path d="M20.8 38.5V25.1L32 31.6V45L20.8 38.5Z" fill="#19c783" fill-opacity="0.46"/>
+  <path d="M43.2 38.5V25.1L32 31.6V45L43.2 38.5Z" fill="#d79a2a" fill-opacity="0.42"/>
+  <path d="M21.2 25.1 32 18.9l10.8 6.2L32 31.3 21.2 25.1Z" fill="#f6d77f" fill-opacity="0.22"/>
+  <path d="M21.2 25.1 32 31.3l10.8-6.2" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 31.3v13.1" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5" stroke-linecap="round"/>
 </svg>
