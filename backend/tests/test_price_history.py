@@ -1,15 +1,17 @@
+import json
 import os
 import tempfile
 import time
 import unittest
 from datetime import datetime
+from threading import Thread
 from unittest.mock import patch
 
 import pandas as pd
 
 from logic.prices.history import ensure_historical_prices_with_timeout
 from logic.prices.service import get_historical_file_status_for_ticker, get_latest_price
-from logic.prices.storage import CSVStorageManager
+from logic.prices.storage import CSVStorageManager, PricePersistenceError
 from config import settings
 
 
@@ -117,6 +119,45 @@ class PriceHistoryTests(unittest.TestCase):
 
         self.assertEqual(saved["Date"].tolist(), ["2024-01-05", "2024-01-08"])
         self.assertEqual(saved["Close"].tolist(), [101.25, 102.5])
+
+    def test_concurrent_snapshot_writes_preserve_all_tickers(self) -> None:
+        def save_snapshot(ticker: str, price: float) -> None:
+            CSVStorageManager.save_latest_snapshot(
+                ticker,
+                price,
+                updated_at=datetime(2024, 1, 5, 12, 0),
+                source="test",
+                market_date="2024-01-05",
+            )
+
+        threads = [
+            Thread(target=save_snapshot, args=("AAPL", 101.25)),
+            Thread(target=save_snapshot, args=("MSFT", 202.5)),
+        ]
+
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        with open(settings.LATEST_PRICES_FILE, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        self.assertEqual(set(payload["prices"].keys()), {"AAPL", "MSFT"})
+        self.assertEqual(payload["prices"]["AAPL"]["price"], 101.25)
+        self.assertEqual(payload["prices"]["MSFT"]["price"], 202.5)
+
+    def test_snapshot_write_failure_raises_persistence_error(self) -> None:
+        with patch.object(CSVStorageManager, "_atomic_replace_text", side_effect=OSError("disk full")):
+            with self.assertRaises(PricePersistenceError):
+                CSVStorageManager.save_latest_snapshot("AAPL", 101.25)
+
+    def test_historical_dataframe_write_failure_raises_persistence_error(self) -> None:
+        df = pd.DataFrame({"Date": ["2024-01-05"], "Close": [101.25]})
+
+        with patch.object(CSVStorageManager, "_atomic_replace_text", side_effect=OSError("disk full")):
+            with self.assertRaises(PricePersistenceError):
+                CSVStorageManager.save_historical_dataframe("AAPL", df)
 
     def test_timeout_wrapper_returns_promptly(self) -> None:
         def slow_fetch(_transactions):

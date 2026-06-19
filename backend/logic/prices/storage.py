@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -33,6 +35,78 @@ class CSVStorageManager:
     """
     Manages historical price CSV files with mtime-based caching.
     """
+
+    _LOCK_TIMEOUT_SECONDS = 10.0
+    _LOCK_POLL_SECONDS = 0.05
+
+    @staticmethod
+    @contextmanager
+    def _file_lock(target_path: str):
+        """Guard file writes across cron/API processes with a tiny lock file."""
+        import time
+
+        lock_path = f"{target_path}.lock"
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        deadline = time.monotonic() + CSVStorageManager._LOCK_TIMEOUT_SECONDS
+        lock_fd = None
+
+        while lock_fd is None:
+            try:
+                lock_fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                os.write(lock_fd, str(os.getpid()).encode("ascii"))
+            except FileExistsError:
+                if time.monotonic() >= deadline:
+                    raise PricePersistenceError(f"Timed out waiting for file lock: {lock_path}")
+                time.sleep(CSVStorageManager._LOCK_POLL_SECONDS)
+
+        try:
+            yield
+        finally:
+            os.close(lock_fd)
+            try:
+                os.unlink(lock_path)
+            except FileNotFoundError:
+                pass
+
+    @staticmethod
+    def _atomic_replace_text(target_path: str, content: str) -> None:
+        """Write text to a temp file and atomically replace the target."""
+        directory = os.path.dirname(target_path)
+        os.makedirs(directory, exist_ok=True)
+        temp_path = None
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=directory,
+                prefix=f".{os.path.basename(target_path)}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temp_path = handle.name
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            os.replace(temp_path, target_path)
+            temp_path = None
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    logger.warning(f"Could not remove temporary price file: {temp_path}")
+
+    @staticmethod
+    def _atomic_write_json(target_path: str, payload: Dict[str, object]) -> None:
+        content = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+        CSVStorageManager._atomic_replace_text(target_path, content)
+
+    @staticmethod
+    def _atomic_write_dataframe(target_path: str, df: pd.DataFrame) -> None:
+        content = df.to_csv(index=False)
+        CSVStorageManager._atomic_replace_text(target_path, content)
 
     @staticmethod
     def get_csv_path(ticker: str) -> str:
@@ -89,42 +163,40 @@ class CSVStorageManager:
         snapshot_file = CSVStorageManager.get_snapshot_path()
         os.makedirs(os.path.dirname(snapshot_file), exist_ok=True)
 
-        existing = CSVStorageManager.load_latest_snapshots()
-        now_utc = datetime.now(timezone.utc).isoformat()
-
-        for ticker, snapshot in snapshots.items():
-            normalized_ticker = normalize_ticker(ticker)
-            if not normalized_ticker:
-                continue
-
-            price = snapshot.get("price")
-            if price is None:
-                continue
-
-            updated_at = snapshot.get("updated_at") or now_utc
-            market_date = snapshot.get("market_date")
-            if market_date is None:
-                try:
-                    market_date = datetime.fromisoformat(str(updated_at)).date().isoformat()
-                except ValueError:
-                    market_date = datetime.now(timezone.utc).date().isoformat()
-
-            existing[normalized_ticker] = {
-                "price": float(price),
-                "updated_at": str(updated_at),
-                "market_date": str(market_date),
-                "source": str(snapshot.get("source", "snapshot")),
-            }
-
-        payload = {
-            "updated_at": now_utc,
-            "prices": {ticker: existing[ticker] for ticker in sorted(existing.keys())},
-        }
-
         try:
-            with open(snapshot_file, "w", encoding="utf-8") as handle:
-                json.dump(payload, handle, indent=2, sort_keys=True)
-                handle.write("\n")
+            with CSVStorageManager._file_lock(snapshot_file):
+                existing = CSVStorageManager.load_latest_snapshots()
+                now_utc = datetime.now(timezone.utc).isoformat()
+
+                for ticker, snapshot in snapshots.items():
+                    normalized_ticker = normalize_ticker(ticker)
+                    if not normalized_ticker:
+                        continue
+
+                    price = snapshot.get("price")
+                    if price is None:
+                        continue
+
+                    updated_at = snapshot.get("updated_at") or now_utc
+                    market_date = snapshot.get("market_date")
+                    if market_date is None:
+                        try:
+                            market_date = datetime.fromisoformat(str(updated_at)).date().isoformat()
+                        except ValueError:
+                            market_date = datetime.now(timezone.utc).date().isoformat()
+
+                    existing[normalized_ticker] = {
+                        "price": float(price),
+                        "updated_at": str(updated_at),
+                        "market_date": str(market_date),
+                        "source": str(snapshot.get("source", "snapshot")),
+                    }
+
+                payload = {
+                    "updated_at": now_utc,
+                    "prices": {ticker: existing[ticker] for ticker in sorted(existing.keys())},
+                }
+                CSVStorageManager._atomic_write_json(snapshot_file, payload)
         except OSError as exc:
             logger.error(f"Error saving latest price snapshots to {snapshot_file}: {exc}")
             raise PricePersistenceError(
@@ -220,31 +292,37 @@ class CSVStorageManager:
 
             date_str = date.strftime("%Y-%m-%d")
 
-            if os.path.exists(csv_file):
-                df = pd.read_csv(csv_file, usecols=["Date", "Close"])
-                df["Date"] = pd.to_datetime(df["Date"], format="mixed", utc=True, errors="coerce")
-                df = df.dropna(subset=["Date"])
+            with CSVStorageManager._file_lock(csv_file):
+                if os.path.exists(csv_file):
+                    df = pd.read_csv(csv_file, usecols=["Date", "Close"])
+                    df["Date"] = pd.to_datetime(df["Date"], format="mixed", utc=True, errors="coerce")
+                    df = df.dropna(subset=["Date"])
 
-                if not df.empty:
-                    df["date_str"] = df["Date"].dt.strftime("%Y-%m-%d")
-                    if date_str in df["date_str"].values:
-                        df.loc[df["date_str"] == date_str, "Close"] = price
-                        df = df.sort_values("Date")
-                        df["Date"] = df["date_str"]
-                        df[["Date", "Close"]].to_csv(csv_file, index=False)
-                        logger.info(f"💾 Updated {ticker}: ${price:.2f} ({date_str})")
+                    if not df.empty:
+                        df["date_str"] = df["Date"].dt.strftime("%Y-%m-%d")
+                        if date_str in df["date_str"].values:
+                            df.loc[df["date_str"] == date_str, "Close"] = price
+                            df = df.sort_values("Date")
+                            df["Date"] = df["date_str"]
+                            output_df = df[["Date", "Close"]]
+                            CSVStorageManager._atomic_write_dataframe(csv_file, output_df)
+                            logger.info(f"💾 Updated {ticker}: ${price:.2f} ({date_str})")
+                            CSVStorageManager.invalidate_cache(ticker)
+                            return
+
+                        output_df = pd.concat(
+                            [
+                                df[["date_str", "Close"]].rename(columns={"date_str": "Date"}),
+                                pd.DataFrame([{"Date": date_str, "Close": price}]),
+                            ],
+                            ignore_index=True,
+                        )
+                        CSVStorageManager._atomic_write_dataframe(csv_file, output_df)
+                        logger.info(f"💾 Appended {ticker}: ${price:.2f} ({date_str})")
                         CSVStorageManager.invalidate_cache(ticker)
                         return
 
-                    with open(csv_file, "a") as handle:
-                        handle.write(f"{date_str},{price:.2f}\n")
-                    logger.info(f"💾 Appended {ticker}: ${price:.2f} ({date_str})")
-                    CSVStorageManager.invalidate_cache(ticker)
-                    return
-
-            with open(csv_file, "w") as handle:
-                handle.write("Date,Close\n")
-                handle.write(f"{date_str},{price:.2f}\n")
+                CSVStorageManager._atomic_replace_text(csv_file, f"Date,Close\n{date_str},{price:.2f}\n")
             logger.info(f"💾 Created {ticker}: ${price:.2f} ({date_str})")
             CSVStorageManager.invalidate_cache(ticker)
         except OSError as exc:
@@ -253,8 +331,9 @@ class CSVStorageManager:
                 f"Could not write {csv_file}: {exc}. "
                 "Check that the container user can write to the data volume."
             ) from exc
-        except Exception as e:
-            logger.error(f"Error saving price for {ticker}: {e}")
+        except Exception as exc:
+            logger.error(f"Error saving price for {ticker}: {exc}")
+            raise PricePersistenceError(f"Could not save price for {ticker}: {exc}") from exc
 
     @staticmethod
     def save_historical_dataframe(ticker: str, df: pd.DataFrame) -> None:
@@ -269,27 +348,36 @@ class CSVStorageManager:
             df_clean["Date"] = pd.to_datetime(df_clean["Date"], format="mixed", utc=True, errors="coerce")
             df_clean = df_clean.dropna(subset=["Date", "Close"])
 
-            if os.path.exists(csv_file):
-                existing_df = pd.read_csv(csv_file, usecols=["Date", "Close"])
-                existing_df["Date"] = pd.to_datetime(existing_df["Date"], format="mixed", utc=True, errors="coerce")
-                existing_df = existing_df.dropna(subset=["Date"])
+            with CSVStorageManager._file_lock(csv_file):
+                if os.path.exists(csv_file):
+                    existing_df = pd.read_csv(csv_file, usecols=["Date", "Close"])
+                    existing_df["Date"] = pd.to_datetime(
+                        existing_df["Date"], format="mixed", utc=True, errors="coerce"
+                    )
+                    existing_df = existing_df.dropna(subset=["Date"])
 
-                combined = pd.concat([existing_df, df_clean], ignore_index=True)
-                combined = combined.sort_values("Date")
-                combined["date_only"] = combined["Date"].dt.strftime("%Y-%m-%d")
-                combined = combined.drop_duplicates(subset=["date_only"], keep="last")
-                combined[["date_only", "Close"]].rename(columns={"date_only": "Date"}).to_csv(csv_file, index=False)
-                logger.info(f"✅ Merged {len(df_clean)} prices into {ticker} ({len(combined)} total)")
-            else:
-                df_clean = df_clean.sort_values("Date")
-                df_clean["date_only"] = df_clean["Date"].dt.strftime("%Y-%m-%d")
-                df_clean = df_clean.drop_duplicates(subset=["date_only"], keep="last")
-                df_clean[["date_only", "Close"]].rename(columns={"date_only": "Date"}).to_csv(csv_file, index=False)
-                logger.info(f"✅ Created {ticker} with {len(df_clean)} historical prices")
+                    combined = pd.concat([existing_df, df_clean], ignore_index=True)
+                    combined = combined.sort_values("Date")
+                    combined["date_only"] = combined["Date"].dt.strftime("%Y-%m-%d")
+                    combined = combined.drop_duplicates(subset=["date_only"], keep="last")
+                    output_df = combined[["date_only", "Close"]].rename(columns={"date_only": "Date"})
+                    CSVStorageManager._atomic_write_dataframe(csv_file, output_df)
+                    logger.info(f"✅ Merged {len(df_clean)} prices into {ticker} ({len(combined)} total)")
+                else:
+                    df_clean = df_clean.sort_values("Date")
+                    df_clean["date_only"] = df_clean["Date"].dt.strftime("%Y-%m-%d")
+                    df_clean = df_clean.drop_duplicates(subset=["date_only"], keep="last")
+                    output_df = df_clean[["date_only", "Close"]].rename(columns={"date_only": "Date"})
+                    CSVStorageManager._atomic_write_dataframe(csv_file, output_df)
+                    logger.info(f"✅ Created {ticker} with {len(df_clean)} historical prices")
 
             CSVStorageManager.invalidate_cache(ticker)
-        except Exception as e:
-            logger.error(f"Error saving historical data for {ticker}: {e}")
+        except OSError as exc:
+            logger.error(f"Error writing historical data for {ticker} ({csv_file}): {exc}")
+            raise PricePersistenceError(f"Could not write {csv_file}: {exc}") from exc
+        except Exception as exc:
+            logger.error(f"Error saving historical data for {ticker}: {exc}")
+            raise PricePersistenceError(f"Could not save historical data for {ticker}: {exc}") from exc
 
 
 def list_historical_tickers() -> List[str]:

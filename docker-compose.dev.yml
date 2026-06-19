@@ -49,7 +49,9 @@ services:
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://backend:8060  # Use Docker service name for API proxy
+      # Browser code runs on the host, not inside Docker. Use localhost so
+      # http://localhost:3000 can reach the published backend port.
+      - VITE_API_URL=http://localhost:8060
       # Docker Desktop/macOS sometimes drops file system events; force polling so edits trigger HMR reliably.
       - CHOKIDAR_USEPOLLING=true
       - CHOKIDAR_INTERVAL=300
@@ -58,7 +60,7 @@ services:
       - VITE_HMR_CLIENT_PORT=3000
       - VITE_USE_POLLING=true
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5173/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:5173/"]
       interval: 30s
       timeout: 10s
       retries: 3
