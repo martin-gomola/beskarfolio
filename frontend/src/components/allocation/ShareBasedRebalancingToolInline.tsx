@@ -281,11 +281,11 @@ export function ShareBasedRebalancingToolInline() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* LEFT: Planned Trades - 40% on desktop, full width on mobile */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className={`lg:col-span-2 space-y-3 ${showTickerDropdown ? 'relative z-30' : ''}`}>
           <h3 className="text-base lg:text-lg font-bold text-white">Planned Trades</h3>
 
           {/* Add trade form */}
-          <div className="glass rounded-xl p-3 space-y-2">
+          <div className={`glass rounded-xl p-3 space-y-2 ${showTickerDropdown ? 'relative z-40' : 'relative z-0'}`}>
             <div className="grid grid-cols-3 gap-2">
               <select
                 value={newAction}
@@ -336,7 +336,7 @@ export function ShareBasedRebalancingToolInline() {
                 {showTickerDropdown && (
                   <div
                     ref={dropdownRef}
-                    className="absolute z-50 mt-1 w-full bg-surface-elevated border border-white/[0.08] rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                    className="absolute z-[100] mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-white/15 bg-surface-elevated shadow-2xl shadow-black/60"
                   >
                     {filteredTickers.length > 0 ? (
                       filteredTickers.map(ticker => (
@@ -395,7 +395,7 @@ export function ShareBasedRebalancingToolInline() {
           )}
 
           {/* Trades list */}
-          <div className="space-y-2">
+          <div className="relative z-0 space-y-2">
             {Object.values(shareChanges).map(change => {
               const holding = holdings.find(h => h.ticker === change.ticker)
               const maxSellShares = holding?.shares || 0
