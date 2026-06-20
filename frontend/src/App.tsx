@@ -515,9 +515,10 @@ const App: React.FC = () => {
 
         {/* Tax Tab */}
         {activeTab === 'tax' && (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h2 className="text-2xl font-bold text-gray-100 font-heading">Tax-Free Holdings Analysis</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-100 font-heading">Tax-Free Planner</h2>
+              <p className="mt-1 text-sm text-gray-400">See what is safe to sell now and what becomes tax-free soon.</p>
             </div>
 
             <Suspense fallback={<TabLoader />}>
