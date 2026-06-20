@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Holding, PortfolioSummary, TaxFreeHolding, Transaction } from '../../../types'
 import { TickerInfo, AISettings, PortfolioHolding, TICKER_INFO_CACHE_KEY } from '../types'
 import { TICKER_SECTORS, ETF_PATTERNS, HORIZON_LABELS, GOAL_LABELS } from '../constants'
-import { PromptContext } from '../prompts/types'
+import { DEFAULT_PROMPT_OPTIONS, PromptContext, PromptOptions } from '../prompts/types'
 
 const loadTickerInfoCache = (): Record<string, TickerInfo> => {
   try {
@@ -49,7 +49,8 @@ export function usePortfolioContext(
   taxFreeData?: TaxFreeHolding[] | null,
   transactions: Transaction[] = [],
   selectedTicker = '',
-  replacementTicker = ''
+  replacementTicker = '',
+  promptOptions: PromptOptions = DEFAULT_PROMPT_OPTIONS
 ): { portfolioData: PortfolioHolding[] | null; promptContext: PromptContext | null } {
 
   const portfolioData = useMemo(() => {
@@ -112,6 +113,7 @@ export function usePortfolioContext(
 
     const profile = settings.profile
     const hasProfile = !!(profile?.age || profile?.horizon || profile?.goal)
+    const shouldIncludeProfile = promptOptions.includeProfile && hasProfile
     const profileSection = hasProfile ? `
 ### Investor Profile:
 ${profile?.age ? `- **Age:** ${profile.age} years old` : ''}
@@ -120,6 +122,7 @@ ${profile?.goal ? `- **Primary Goal:** ${GOAL_LABELS[profile.goal]}` : ''}
 `.trim() : ''
 
     const hasTaxFreeData = !!(taxFreeData && taxFreeData.length > 0)
+    const shouldIncludeTax = promptOptions.includeTax && hasTaxFreeData
     const taxFreeSection = hasTaxFreeData ? buildTaxFreeSection(taxFreeData!) : ''
     const normalizedSelectedTicker = selectedTicker.toUpperCase()
     const normalizedReplacementTicker = replacementTicker.trim().toUpperCase()
@@ -134,7 +137,7 @@ ${profile?.goal ? `- **Primary Goal:** ${GOAL_LABELS[profile.goal]}` : ''}
 
     const baseContext = `
 ## My Portfolio
-${hasProfile ? `\n${profileSection}\n` : ''}
+${shouldIncludeProfile ? `\n${profileSection}\n` : ''}
 **Total Value:** €${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 **Total P&L:** €${totalGainLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%)
 **Number of Holdings:** ${holdings.length}
@@ -147,7 +150,7 @@ ${regionSummary}
 
 ### Holdings (sorted by value):
 ${holdingsTable}
-${hasTaxFreeData ? `\n${taxFreeSection}` : ''}
+${shouldIncludeTax ? `\n${taxFreeSection}` : ''}
 `.trim()
 
     return {
@@ -169,10 +172,11 @@ ${hasTaxFreeData ? `\n${taxFreeSection}` : ''}
       replacementTicker: normalizedReplacementTicker,
       selectedTickerTransactions,
       selectedTickerHolding,
-      selectedTickerTaxFreeSection,
+      selectedTickerTaxFreeSection: promptOptions.includeTax ? selectedTickerTaxFreeSection : '',
+      promptOptions,
       baseContext,
     }
-  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData, transactions, selectedTicker, replacementTicker])
+  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData, transactions, selectedTicker, replacementTicker, promptOptions])
 
   return { portfolioData, promptContext }
 }

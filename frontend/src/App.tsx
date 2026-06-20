@@ -127,11 +127,11 @@ interface TabConfig {
 const TAB_CONFIG: TabConfig[] = [
   { id: 'dashboard', label: 'Dashboard', shortLabel: 'Home', icon: '📊', iconKey: 'dashboard', showInDesktopNav: true, showInMobileNav: true },
   { id: 'performance', label: 'Performance', shortLabel: 'Perf', icon: '📈', iconKey: 'performance', showInDesktopNav: true, showInMobileNav: true },
-  { id: 'allocation', label: 'Allocation', shortLabel: 'Alloc', icon: '🎯', iconKey: 'allocation', showInDesktopNav: true, showInMobileNav: true },
+  { id: 'allocation', label: 'Allocation', shortLabel: 'Alloc', icon: '🎯', iconKey: 'allocation', showInDesktopNav: true, showInMobileMenu: true },
   { id: 'transactions', label: 'Transactions', shortLabel: 'Txns', icon: '💳', iconKey: 'transactions', showInDesktopNav: true, showInMobileNav: true },
   { id: 'import-export', label: 'Import', shortLabel: 'Import', icon: '📥', iconKey: 'import', showInDesktopNav: true, showInMobileMenu: true },
   { id: 'tax', label: 'Tax', icon: '🧾', iconKey: 'tax', showInDesktopNav: true, showInMobileMenu: true },
-  { id: 'ai', label: 'AI', shortLabel: 'AI', icon: '🤖', iconKey: 'ai', showInDesktopNav: true, showInMobileMenu: true },
+  { id: 'ai', label: 'AI', shortLabel: 'AI', icon: '🤖', iconKey: 'ai', showInDesktopNav: true, showInMobileNav: true },
   { id: 'settings', label: 'Settings', icon: '⚙️', iconKey: 'settings', showInMobileMenu: true },
 ]
 

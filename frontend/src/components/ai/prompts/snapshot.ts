@@ -1,4 +1,5 @@
 import { ClipboardList } from 'lucide-react'
+import { buildGuidanceSection } from './guidance'
 import { PromptDefinition } from './types'
 
 // Primer prompt: pastes portfolio basics into any AI agent as context before
@@ -39,6 +40,8 @@ export const snapshotPrompt: PromptDefinition = {
 
 | Ticker | Shares | Avg Cost | Currency | Current Value (EUR) | % of Portfolio |
 |--------|--------|----------|----------|---------------------|----------------|
-${rows.join('\n')}`
+${rows.join('\n')}
+
+${buildGuidanceSection(ctx)}`
   },
 }

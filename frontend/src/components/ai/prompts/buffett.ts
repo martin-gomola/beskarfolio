@@ -1,4 +1,5 @@
 import { User } from 'lucide-react'
+import { buildGuidanceSection } from './guidance'
 import { PromptDefinition } from './types'
 
 export const buffettPrompt: PromptDefinition = {
@@ -15,6 +16,8 @@ export const buffettPrompt: PromptDefinition = {
 ${ctx.baseContext}
 
 ---
+
+${buildGuidanceSection(ctx)}
 
 **Your Task:** Evaluate this portfolio through a value investing lens.
 

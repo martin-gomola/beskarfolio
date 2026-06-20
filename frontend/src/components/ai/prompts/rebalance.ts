@@ -1,4 +1,5 @@
 import { Scale } from 'lucide-react'
+import { buildGuidanceSection } from './guidance'
 import { PromptDefinition } from './types'
 import { HORIZON_LABELS, GOAL_LABELS } from '../constants'
 
@@ -29,6 +30,8 @@ ${ctx.baseContext}
 ---
 
 **Investor Context**: ${contextDescription}${taxNote}
+
+${buildGuidanceSection(ctx)}
 
 **Your Task:** Analyze for rebalancing opportunities.
 

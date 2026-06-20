@@ -1,4 +1,5 @@
 import { PieChart } from 'lucide-react'
+import { buildGuidanceSection } from './guidance'
 import { PromptDefinition } from './types'
 
 export const analysisPrompt: PromptDefinition = {
@@ -15,6 +16,8 @@ export const analysisPrompt: PromptDefinition = {
 ${ctx.baseContext}
 
 ---
+
+${buildGuidanceSection(ctx)}
 
 **Your Task:** Provide a comprehensive portfolio analysis.
 

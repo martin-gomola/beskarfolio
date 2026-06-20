@@ -2,6 +2,30 @@ import { LucideIcon } from 'lucide-react'
 import { Transaction } from '../../../types'
 import { InvestorProfile, PortfolioHolding } from '../types'
 
+export type PromptDepth = 'simple' | 'detailed'
+export type PromptLens = 'balanced' | 'conservative' | 'growth' | 'income' | 'core-satellite'
+export type PromptOutput = 'summary' | 'table' | 'checklist'
+
+export interface PromptOptions {
+  depth: PromptDepth
+  lens: PromptLens
+  output: PromptOutput
+  includeProfile: boolean
+  includeTax: boolean
+  includeTransactions: boolean
+  askClarifyingQuestions: boolean
+}
+
+export const DEFAULT_PROMPT_OPTIONS: PromptOptions = {
+  depth: 'simple',
+  lens: 'balanced',
+  output: 'checklist',
+  includeProfile: true,
+  includeTax: true,
+  includeTransactions: true,
+  askClarifyingQuestions: false,
+}
+
 // Context passed to each prompt generator
 export interface PromptContext {
   // Portfolio data
@@ -30,6 +54,7 @@ export interface PromptContext {
   selectedTickerTransactions: Transaction[]
   selectedTickerHolding?: PortfolioHolding
   selectedTickerTaxFreeSection: string
+  promptOptions: PromptOptions
 
   // Pre-built base context string
   baseContext: string

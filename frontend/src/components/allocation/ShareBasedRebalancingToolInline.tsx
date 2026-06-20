@@ -25,14 +25,91 @@ interface ShareChange {
   currency: string          // 'USD' or 'EUR'
 }
 
+interface PersistedShareChange {
+  ticker: string
+  shares: number
+}
+
+const TRADE_PLAN_STORAGE_KEY = 'beskarfolio_allocation_trade_plan'
+
+const loadPersistedTradePlan = (): PersistedShareChange[] => {
+  try {
+    const stored = localStorage.getItem(TRADE_PLAN_STORAGE_KEY)
+    if (!stored) return []
+
+    const parsed = JSON.parse(stored)
+    if (!Array.isArray(parsed)) return []
+
+    return parsed
+      .filter((item): item is PersistedShareChange => {
+        return (
+          item &&
+          typeof item.ticker === 'string' &&
+          Number.isFinite(item.shares) &&
+          item.shares !== 0
+        )
+      })
+      .map(item => ({
+        ticker: item.ticker.trim().toUpperCase(),
+        shares: item.shares
+      }))
+      .filter(item => item.ticker.length > 0)
+  } catch (err) {
+    console.error('Failed to load allocation trade plan:', err)
+    return []
+  }
+}
+
+const savePersistedTradePlan = (changes: Record<string, ShareChange>): void => {
+  try {
+    const persisted = Object.values(changes).map(change => ({
+      ticker: change.ticker,
+      shares: change.shares
+    }))
+
+    if (persisted.length === 0) {
+      localStorage.removeItem(TRADE_PLAN_STORAGE_KEY)
+      return
+    }
+
+    localStorage.setItem(TRADE_PLAN_STORAGE_KEY, JSON.stringify(persisted))
+  } catch (err) {
+    console.error('Failed to save allocation trade plan:', err)
+  }
+}
+
+const buildShareChange = (
+  ticker: string,
+  shares: number,
+  holdings: ReturnType<typeof usePortfolio>['holdings']
+): ShareChange | null => {
+  const holding = holdings.find(h => h.ticker === ticker)
+  if (!holding || holding.current_price <= 0 || holding.shares <= 0) return null
+
+  const isSell = shares < 0
+  const maxSellShares = holding.shares
+  const clampedShares = isSell ? -Math.min(Math.abs(shares), maxSellShares) : shares
+  if (clampedShares === 0) return null
+
+  return {
+    ticker,
+    action: clampedShares > 0 ? 'buy' : 'sell',
+    shares: clampedShares,
+    currentPrice: holding.current_price,
+    currentPriceEur: holding.current_value_eur / holding.shares,
+    currency: holding.currency || 'EUR'
+  }
+}
+
 export function ShareBasedRebalancingToolInline() {
-  const { holdings } = usePortfolio()
+  const { holdings, loading } = usePortfolio()
   const [shareChanges, setShareChanges] = useState<Record<string, ShareChange>>({})
   const [newTicker, setNewTicker] = useState('')
   const [newShares, setNewShares] = useState('')
   const [newAction, setNewAction] = useState<'buy' | 'sell'>('buy')
   const [error, setError] = useState<string | null>(null)
   const [showTickerDropdown, setShowTickerDropdown] = useState(false)
+  const [hasLoadedPersistedChanges, setHasLoadedPersistedChanges] = useState(false)
   const tickerInputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -60,6 +137,38 @@ export function ShareBasedRebalancingToolInline() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (loading || hasLoadedPersistedChanges) return
+
+    const restoredChanges = loadPersistedTradePlan().reduce<Record<string, ShareChange>>((acc, item) => {
+      const change = buildShareChange(item.ticker, item.shares, holdings)
+      if (change) acc[change.ticker] = change
+      return acc
+    }, {})
+
+    setShareChanges(restoredChanges)
+    setHasLoadedPersistedChanges(true)
+  }, [hasLoadedPersistedChanges, holdings, loading])
+
+  useEffect(() => {
+    if (!hasLoadedPersistedChanges) return
+    savePersistedTradePlan(shareChanges)
+  }, [hasLoadedPersistedChanges, shareChanges])
+
+  useEffect(() => {
+    if (!hasLoadedPersistedChanges || loading || Object.keys(shareChanges).length === 0) return
+
+    const reconciledChanges = Object.values(shareChanges).reduce<Record<string, ShareChange>>((acc, change) => {
+      const reconciled = buildShareChange(change.ticker, change.shares, holdings)
+      if (reconciled) acc[reconciled.ticker] = reconciled
+      return acc
+    }, {})
+
+    if (JSON.stringify(reconciledChanges) !== JSON.stringify(shareChanges)) {
+      setShareChanges(reconciledChanges)
+    }
+  }, [hasLoadedPersistedChanges, holdings, loading, shareChanges])
 
   // Calculate current portfolio value (in EUR)
   const currentPortfolioValue = holdings.reduce((sum, h) => sum + h.current_value_eur, 0)

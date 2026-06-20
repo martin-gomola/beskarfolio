@@ -1,4 +1,5 @@
 import { CircleDollarSign } from 'lucide-react'
+import { buildGuidanceSection } from './guidance'
 import { PromptDefinition } from './types'
 
 export const dividendsPrompt: PromptDefinition = {
@@ -15,6 +16,8 @@ export const dividendsPrompt: PromptDefinition = {
 ${ctx.baseContext}
 
 ---
+
+${buildGuidanceSection(ctx)}
 
 **Your Task:** Analyze this portfolio from an income perspective.
 
