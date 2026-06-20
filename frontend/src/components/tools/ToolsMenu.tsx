@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useSwipeToDismiss } from '../../hooks'
 import { PctChangeCalc } from './PctChangeCalc'
 import { BreakEvenCalc } from './BreakEvenCalc'
 import { PositionSizeCalc } from './PositionSizeCalc'
@@ -56,8 +55,6 @@ export const ToolsMenu: React.FC = () => {
     setMenuOpen(false)
   }
 
-  const { sheetProps } = useSwipeToDismiss({ onDismiss: handleClose })
-
   useEffect(() => {
     if (!isOpen) return
     const handleKey = (e: KeyboardEvent) => {
@@ -98,12 +95,8 @@ export const ToolsMenu: React.FC = () => {
           onClick={(e) => e.target === e.currentTarget && handleClose()}
         >
           <div
-            {...sheetProps}
             className="bg-surface-dark w-full sm:max-w-sm rounded-2xl border border-white/10 mx-4 sm:mx-0 overflow-hidden animate-slide-up"
           >
-            {/* Swipe handle (mobile only) */}
-            <div className="w-9 h-1 rounded-full bg-white/20 mx-auto mt-2 sm:hidden" />
-
             {/* Tool menu (no tool selected) */}
             {menuOpen && !activeTool && (
               <>

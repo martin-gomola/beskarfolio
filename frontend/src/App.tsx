@@ -10,8 +10,7 @@ import {
   usePullToRefresh,
   useServiceWorkerUpdate,
   usePrivacyMode,
-  PrivacyProvider,
-  useSwipeNavigation
+  PrivacyProvider
 } from './hooks'
 import { clearAllCaches, updateTransactionsHash } from './utils/guestCache'
 
@@ -140,7 +139,6 @@ const TAB_CONFIG: TabConfig[] = [
 const DESKTOP_NAV_TABS = TAB_CONFIG.filter(t => t.showInDesktopNav)
 const MOBILE_NAV_TABS = TAB_CONFIG.filter(t => t.showInMobileNav)
 const MOBILE_MENU_TABS = TAB_CONFIG.filter(t => t.showInMobileMenu)
-const MOBILE_SWIPE_TAB_IDS = MOBILE_NAV_TABS.map(t => t.id)
 
 // Privacy toggle button for header
 const PrivacyToggle: React.FC = () => {
@@ -191,13 +189,6 @@ const App: React.FC = () => {
   const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
     onRefresh: handleDataUpdate,
     threshold: 80
-  })
-
-  // Swipe between mobile nav tabs
-  useSwipeNavigation({
-    tabs: MOBILE_SWIPE_TAB_IDS,
-    activeTab,
-    onNavigate: (tab) => { setActiveTab(tab as TabType); window.location.hash = tab },
   })
 
   // Sync tab with URL hash

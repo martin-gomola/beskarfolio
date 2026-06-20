@@ -1,5 +1,4 @@
 import React, { ReactNode } from 'react'
-import { useSwipeToDismiss } from '../../hooks'
 
 interface ModalProps {
   isOpen: boolean
@@ -16,8 +15,6 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md'
 }) => {
-  const { sheetProps } = useSwipeToDismiss({ onDismiss: onClose })
-
   if (!isOpen) return null
 
   const sizeClasses = {
@@ -37,10 +34,8 @@ export const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
-        {...sheetProps}
         className={`bg-surface-dark w-full ${sizeClasses[size]} rounded-2xl border border-white/10 max-h-[85vh] mx-4 sm:mx-0 overflow-hidden animate-slide-up`}
       >
-        <div className="w-9 h-1 rounded-full bg-white/20 mx-auto mt-2 sm:hidden" aria-hidden="true" />
         <div className="px-5 pt-4 pb-3 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-white tracking-tight">{title}</h2>
           <button 

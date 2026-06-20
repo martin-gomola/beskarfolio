@@ -4,7 +4,7 @@ import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
 import { Transaction } from '../../types'
 import { formatCurrency, getEffectiveCurrencyForTicker } from '../../utils'
 import { LoadingSpinner } from '../common'
-import { SwipeableRow } from '../common/SwipeableRow'
+import { ActionRow } from '../common/ActionRow'
 import { EditTransactionModal } from './EditTransactionModal'
 
 type TxSortKey = 'date' | 'ticker' | 'type' | 'shares' | 'price' | 'total'
@@ -139,7 +139,7 @@ export const AllTransactionsTable: React.FC<AllTransactionsTableProps> = ({ onUp
           </div>
         </div>
 
-        {/* Mobile: Swipeable list (swipe left to edit) */}
+        {/* Mobile: compact list with explicit edit action */}
         <div className="sm:hidden divide-y divide-white/5">
           {visibleTransactions.length === 0 ? (
             <div className="py-8 text-center text-gray-500">No transactions found</div>
@@ -147,7 +147,7 @@ export const AllTransactionsTable: React.FC<AllTransactionsTableProps> = ({ onUp
             visibleTransactions.map((transaction) => {
               const effectiveCurrency = getEffectiveCurrencyForTicker(transaction.ticker, transaction.currency)
               return (
-                <SwipeableRow key={transaction.id} onAction={() => setEditingTransaction(transaction)}>
+                <ActionRow key={transaction.id} onAction={() => setEditingTransaction(transaction)}>
                   <div className="w-full flex items-center gap-3 px-4 py-3">
                   
                     <div className="flex-1 min-w-0">
@@ -174,7 +174,7 @@ export const AllTransactionsTable: React.FC<AllTransactionsTableProps> = ({ onUp
                       </span>
                     </div>
                   </div>
-                </SwipeableRow>
+                </ActionRow>
               )
             })
           )}

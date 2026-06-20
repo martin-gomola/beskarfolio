@@ -4,7 +4,6 @@ import 'react-datepicker/dist/react-datepicker.css'
 import { transactionService } from '../../services'
 import { Transaction, TransactionFormData } from '../../types'
 import { getEffectiveCurrencyForTicker, isStrongEurTicker, getDefaultWithholding, normalizeDecimal } from '../../utils'
-import { useSwipeToDismiss } from '../../hooks'
 
 interface EditTransactionModalProps {
   transaction: Transaction
@@ -90,8 +89,6 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
   }
 
   const isBuy = formData.type === 'buy'
-  const { sheetProps } = useSwipeToDismiss({ onDismiss: onClose })
-
   const netAmount = isDividend
     ? (parseFloat(formData.gross_amount || '0') || 0) - (parseFloat(formData.withholding_tax || '0') || 0)
     : 0
@@ -101,8 +98,7 @@ export const EditTransactionModal: React.FC<EditTransactionModalProps> = ({
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div {...sheetProps} className="bg-surface-dark w-full sm:max-w-md rounded-2xl border border-white/10 mx-4 sm:mx-0 overflow-hidden animate-slide-up">
-        <div className="w-9 h-1 rounded-full bg-white/20 mx-auto mt-2 sm:hidden" />
+      <div className="bg-surface-dark w-full sm:max-w-md rounded-2xl border border-white/10 mx-4 sm:mx-0 overflow-hidden animate-slide-up">
         <div className="px-5 pt-4 pb-3 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-white tracking-tight font-heading">Edit Transaction</h2>
           <button 
