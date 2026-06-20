@@ -55,121 +55,118 @@ const YearTab: React.FC<YearTabProps> = ({ label, isActive, onClick }) => {
 
 interface YearSummaryCardProps {
   data: YearPerformance | AllTimePerformance
+  periodLabel: string
+  benchmark?: BenchmarkSnapshot | null
 }
 
-const YearSummaryCard: React.FC<YearSummaryCardProps> = ({ data }) => {
+interface BenchmarkSnapshot {
+  portfolioReturn: number
+  benchmarkReturn: number
+  delta: number
+}
+
+const formatBenchmarkLabel = (benchmark?: BenchmarkSnapshot | null): string => {
+  if (!benchmark) return 'Benchmark loading'
+  if (benchmark.delta > 0) return `Ahead by ${formatPercent(benchmark.delta)}`
+  if (benchmark.delta < 0) return `Behind by ${Math.abs(benchmark.delta).toFixed(2)}%`
+  return 'Matching benchmark'
+}
+
+const YearSummaryCard: React.FC<YearSummaryCardProps> = ({ data, periodLabel, benchmark }) => {
   const { isPrivate } = usePrivacyMode()
   return (
-    <div className="glass rounded-xl p-4 sm:p-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {/* Row 1: Period + Total Gain (headline metrics) */}
-        
-        {/* Period */}
-        <div>
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-1">
-            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            <span>Period</span>
-          </div>
-          <p className="text-sm sm:text-base text-white leading-tight">
-            <span className="sm:hidden">
-              {formatDate(data.start_date).replace(', ', ' ')} →<br/>
-              {formatDate(data.end_date).replace(', ', ' ')}
+    <section className="glass rounded-xl p-4 sm:p-6">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{periodLabel}</p>
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+              benchmark && benchmark.delta >= 0
+                ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+                : benchmark
+                  ? 'border-rose-500/25 bg-rose-500/10 text-rose-300'
+                  : 'border-white/10 bg-white/[0.03] text-gray-400'
+            }`}>
+              {formatBenchmarkLabel(benchmark)}
             </span>
-            <span className="hidden sm:inline">
+          </div>
+
+          <div className="mt-5">
+            <p className={`text-4xl sm:text-5xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain_pct)}`}>
+              {isPrivate ? PRIVACY_MASK : formatPercent(data.total_gain_pct)}
+            </p>
+            <p className={`mt-2 text-lg sm:text-xl font-medium ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain)}`}>
+              {isPrivate ? PRIVACY_MASK : `${formatCurrency(data.total_gain)} total gain`}
+            </p>
+            <p className="mt-3 text-sm text-gray-500">
               {formatDate(data.start_date)} - {formatDate(data.end_date)}
-            </span>
-          </p>
-        </div>
-
-        {/* Total Gain - moved to row 1 */}
-        <div>
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-1">
-            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-              <polyline points="17 6 23 6 23 12"/>
-            </svg>
-            <span>Total Gain</span>
+            </p>
           </div>
-          <p className={`text-xl sm:text-2xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain)}`}>
-            {isPrivate ? PRIVACY_MASK : formatCurrency(data.total_gain)}
-          </p>
-          <p className={`text-xs sm:text-sm ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain_pct)}`}>
-            {isPrivate ? PRIVACY_MASK : formatPercent(data.total_gain_pct)}
-          </p>
         </div>
 
-        {/* Row 2: Beginning + Ending Balance (comparison) */}
-
-        {/* Beginning Balance */}
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500 uppercase tracking-wider mb-1">
-            <span className="sm:hidden">Start</span>
-            <span className="hidden sm:inline">Beginning</span>
-          </p>
-          <p className="text-lg sm:text-2xl font-semibold text-white tracking-tight">
-            {isPrivate ? PRIVACY_MASK : formatCurrency(data.beginning_balance)}
-          </p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Portfolio</p>
+            <p className={`mt-1 text-base sm:text-xl font-semibold ${isPrivate ? 'text-gray-500' : getGainColor(benchmark?.portfolioReturn ?? data.total_gain_pct)}`}>
+              {isPrivate ? PRIVACY_MASK : benchmark ? formatPercent(benchmark.portfolioReturn) : formatPercent(data.total_gain_pct)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">SXR8.DE</p>
+            <p className="mt-1 text-base sm:text-xl font-semibold text-gray-300">
+              {isPrivate ? PRIVACY_MASK : benchmark ? formatPercent(benchmark.benchmarkReturn) : 'Loading'}
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Delta</p>
+            <p className={`mt-1 text-base sm:text-xl font-semibold ${isPrivate ? 'text-gray-500' : getGainColor(benchmark?.delta ?? 0)}`}>
+              {isPrivate ? PRIVACY_MASK : benchmark ? formatPercent(benchmark.delta) : 'Loading'}
+            </p>
+          </div>
         </div>
+      </div>
 
-        {/* Ending Balance */}
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500 uppercase tracking-wider mb-1">
-            <span className="sm:hidden">End</span>
-            <span className="hidden sm:inline">Ending</span>
-          </p>
-          <p className="text-lg sm:text-2xl font-semibold text-white tracking-tight">
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Value</p>
+          <p className="mt-1 text-sm sm:text-lg font-semibold text-white">
             {isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)}
           </p>
         </div>
-
-        {/* Row 3: Invested + Withdrawn (cash flow) */}
-
-        {/* Deposits */}
-        <div>
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-1">
-            <span className="text-accent-400">↓</span>
-            <span>Invested</span>
-          </div>
-          <p className="text-base sm:text-xl font-medium text-accent-400">
-            {isPrivate ? PRIVACY_MASK : formatCurrency(data.total_invested)}
-          </p>
-        </div>
-
-        {/* Withdrawals */}
-        <div>
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-1">
-            <span className="text-amber-400">↑</span>
-            <span>Withdrawn</span>
-          </div>
-          <p className="text-base sm:text-xl font-medium text-amber-400">
-            {isPrivate ? PRIVACY_MASK : formatCurrency(data.total_withdrawn)}
-          </p>
-        </div>
-
-        {/* Row 4: Net Cash Flow + Trades (summary) */}
-
-        {/* Net Deposits */}
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500 uppercase tracking-wider mb-1">Net Flow</p>
-          <p className={`text-base sm:text-xl font-medium ${isPrivate ? 'text-gray-500' : data.net_deposits >= 0 ? 'text-accent-400' : 'text-amber-400'}`}>
+        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Net flow</p>
+          <p className={`mt-1 text-sm sm:text-lg font-semibold ${isPrivate ? 'text-gray-500' : data.net_deposits >= 0 ? 'text-accent-400' : 'text-amber-400'}`}>
             {isPrivate ? PRIVACY_MASK : formatCurrency(data.net_deposits)}
           </p>
         </div>
-
-        {/* Trade Count */}
-        <div>
-          <p className="text-xs sm:text-sm text-gray-500 uppercase tracking-wider mb-1">Trades</p>
-          <p className="text-base sm:text-xl font-medium text-white">
-            {data.trade_count}
-          </p>
+        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Trades</p>
+          <p className="mt-1 text-sm sm:text-lg font-semibold text-white">{data.trade_count}</p>
         </div>
       </div>
-    </div>
+
+      <details className="mt-3 rounded-lg border border-white/10 bg-black/15">
+        <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium text-gray-300">Cash flow details</summary>
+        <div className="grid grid-cols-2 gap-3 border-t border-white/5 px-3 py-3 text-sm sm:grid-cols-4">
+          <div>
+            <p className="text-xs text-gray-500">Start</p>
+            <p className="text-gray-300">{isPrivate ? PRIVACY_MASK : formatCurrency(data.beginning_balance)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Invested</p>
+            <p className="text-accent-400">{isPrivate ? PRIVACY_MASK : formatCurrency(data.total_invested)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Withdrawn</p>
+            <p className="text-amber-400">{isPrivate ? PRIVACY_MASK : formatCurrency(data.total_withdrawn)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">End</p>
+            <p className="text-gray-300">{isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)}</p>
+          </div>
+        </div>
+      </details>
+    </section>
   )
 }
 
@@ -244,7 +241,7 @@ const TickerBreakdownTable: React.FC<TickerBreakdownTableProps> = ({ tickers }) 
                     <p className="text-gray-300">
                       {isPrivate ? PRIVACY_MASK : ticker.shares_start > 0 
                         ? `${currencySymbol}${(ticker.value_start / ticker.shares_start).toFixed(2)}`
-                        : '—'}
+                        : 'N/A'}
                     </p>
                   </div>
                   <div>
@@ -252,7 +249,7 @@ const TickerBreakdownTable: React.FC<TickerBreakdownTableProps> = ({ tickers }) 
                     <p className="text-gray-300">
                       {isPrivate ? PRIVACY_MASK : ticker.shares_end > 0 
                         ? `${currencySymbol}${(ticker.value_end / ticker.shares_end).toFixed(2)}`
-                        : '—'}
+                        : 'N/A'}
                     </p>
                   </div>
                   <div>
@@ -385,13 +382,96 @@ const TickerBreakdownTable: React.FC<TickerBreakdownTableProps> = ({ tickers }) 
   )
 }
 
+const aggregateTickerDrivers = (years: YearPerformance[] = []): TickerBreakdown[] => {
+  const byTicker = new Map<string, TickerBreakdown>()
+
+  years.forEach((year) => {
+    year.tickers?.forEach((ticker) => {
+      const existing = byTicker.get(ticker.ticker)
+      if (!existing) {
+        byTicker.set(ticker.ticker, { ...ticker })
+        return
+      }
+
+      byTicker.set(ticker.ticker, {
+        ...existing,
+        shares_start: existing.shares_start || ticker.shares_start,
+        shares_end: ticker.shares_end,
+        value_start: existing.value_start || ticker.value_start,
+        value_end: ticker.value_end,
+        invested: existing.invested + ticker.invested,
+        withdrawn: existing.withdrawn + ticker.withdrawn,
+        gain: existing.gain + ticker.gain,
+        gain_pct: existing.value_start > 0
+          ? ((existing.gain + ticker.gain) / existing.value_start) * 100
+          : ticker.gain_pct,
+        trade_count: existing.trade_count + ticker.trade_count,
+      })
+    })
+  })
+
+  return Array.from(byTicker.values())
+}
+
+interface PerformanceDriversProps {
+  tickers: TickerBreakdown[]
+  label: string
+}
+
+const PerformanceDrivers: React.FC<PerformanceDriversProps> = ({ tickers, label }) => {
+  const { isPrivate } = usePrivacyMode()
+  if (!tickers.length) return null
+
+  const topContributor = [...tickers].sort((a, b) => b.gain - a.gain)[0]
+  const biggestDetractor = [...tickers].sort((a, b) => a.gain - b.gain)[0]
+  const mostTraded = [...tickers].sort((a, b) => b.trade_count - a.trade_count)[0]
+
+  const cards = [
+    { title: 'Best contributor', ticker: topContributor, metric: 'gain' as const },
+    { title: 'Needs review', ticker: biggestDetractor, metric: 'gain' as const },
+    { title: 'Most traded', ticker: mostTraded, metric: 'trades' as const },
+  ]
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-lg font-semibold text-white font-heading">Performance drivers</h3>
+        <p className="text-sm text-gray-500">{label}</p>
+      </div>
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {cards.map(({ title, ticker, metric }) => {
+          const currencySymbol = ticker.currency === 'USD' ? '$' : '€'
+          return (
+            <div key={title} className="rounded-lg border border-white/10 bg-surface-dark/80 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{title}</p>
+              <div className="mt-3 flex items-start justify-between gap-3">
+                <p className="font-mono text-lg font-semibold text-accent-300">{ticker.ticker}</p>
+                <p className={`text-right text-sm font-semibold ${isPrivate ? 'text-gray-500' : metric === 'gain' ? getGainColor(ticker.gain) : 'text-white'}`}>
+                  {isPrivate
+                    ? PRIVACY_MASK
+                    : metric === 'gain'
+                      ? formatCurrency(ticker.gain, currencySymbol)
+                      : `${ticker.trade_count} trades`}
+                </p>
+              </div>
+              {metric === 'gain' && (
+                <p className={`mt-1 text-xs ${isPrivate ? 'text-gray-500' : getGainColor(ticker.gain_pct)}`}>
+                  {isPrivate ? PRIVACY_MASK : formatPercent(ticker.gain_pct)}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 export const AnnualPerformanceReport: React.FC = () => {
   const { performanceData, loading, error } = useAnnualPerformance()
   const [selectedTab, setSelectedTab] = useState<string>('all-time')
   const [isTickerTipOpen, setIsTickerTipOpen] = useState(false)
-  const [isCalcTipOpen, setIsCalcTipOpen] = useState(false)
   const tickerTipRef = useRef<HTMLDivElement | null>(null)
-  const calcTipRef = useRef<HTMLDivElement | null>(null)
   const chartFetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   // Performance chart data (all-time source; year tabs derive filtered/rebased view)
@@ -549,27 +629,6 @@ export const AnnualPerformanceReport: React.FC = () => {
     }
   }, [isTickerTipOpen])
 
-  useEffect(() => {
-    if (!isCalcTipOpen) return
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsCalcTipOpen(false)
-    }
-
-    const onPointerDown = (e: MouseEvent | PointerEvent) => {
-      if (!calcTipRef.current) return
-      if (calcTipRef.current.contains(e.target as Node)) return
-      setIsCalcTipOpen(false)
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('pointerdown', onPointerDown)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('pointerdown', onPointerDown)
-    }
-  }, [isCalcTipOpen])
-
   // Annual Performance now works in both guest mode and authenticated mode!
   // Guest mode: Transactions sent from localStorage, calculations done on backend
   // Authenticated mode: Transactions from database, calculations done on backend
@@ -610,101 +669,31 @@ export const AnnualPerformanceReport: React.FC = () => {
         isYear: true
       }
 
+  const latestBenchmarkPoint = [...displayChartData]
+    .reverse()
+    .find(point => typeof point.portfolio_return_pct === 'number' && typeof point.benchmark_return_pct === 'number')
+
+  const benchmarkSnapshot = latestBenchmarkPoint
+    ? {
+        portfolioReturn: latestBenchmarkPoint.portfolio_return_pct ?? 0,
+        benchmarkReturn: latestBenchmarkPoint.benchmark_return_pct ?? 0,
+        delta: (latestBenchmarkPoint.portfolio_return_pct ?? 0) - (latestBenchmarkPoint.benchmark_return_pct ?? 0),
+      }
+    : null
+
+  const driverTickers = selectedData.isYear && selectedData.data && 'tickers' in selectedData.data
+    ? selectedData.data.tickers
+    : aggregateTickerDrivers(performanceData.years)
+
+  const driverLabel = selectedData.isYear
+    ? `Ticker drivers for ${selectedTab}.`
+    : 'Aggregated from yearly ticker breakdowns.'
+
   return (
     <div className="space-y-6">
-      {/* Title with Info Button */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-heading">Annual Performance Report</h2>
-        <div className="relative" ref={calcTipRef}>
-          <button
-            type="button"
-            onClick={() => setIsCalcTipOpen(v => !v)}
-            aria-label="How performance is calculated"
-            aria-expanded={isCalcTipOpen}
-            className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-white/5 border border-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-            title="How it's calculated"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M12 16v-4M12 8h.01"/>
-            </svg>
-          </button>
-
-          {isCalcTipOpen && (
-            <div
-              role="dialog"
-              aria-label="Performance calculation methodology"
-              className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[320px] sm:max-w-[420px] bg-surface-dark border border-white/10 rounded-xl shadow-xl p-4 text-sm text-gray-300 z-50"
-            >
-              <div className="text-white font-semibold mb-2 text-base">Performance Calculation</div>
-              
-              <div className="space-y-3">
-                <div>
-                  <div className="text-white font-medium mb-1">Formula</div>
-                  <div className="text-gray-300 font-mono text-xs bg-white/5 p-2 rounded-lg border border-white/5">
-                    Total Gain = (Ending Balance + Withdrawn) - (Beginning Balance + Invested)
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-white font-medium mb-1">Return %</div>
-                  <div className="text-gray-300 font-mono text-xs bg-white/5 p-2 rounded-lg border border-white/5">
-                    Return % = (Total Gain / Total Invested) × 100
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-white font-medium mb-1">Benchmark (SXR8.DE)</div>
-                  <div className="text-gray-300 text-xs bg-white/5 p-2 rounded-lg border border-white/5">
-                    We compare against S&P 500 ETF SXR8.DE using the same dates as your chart:
-                    <ul className="mt-1 ml-4 list-disc space-y-0.5">
-                      <li>Use benchmark price on each valuation date</li>
-                      <li>Start: benchmark price at first portfolio date</li>
-                      <li>Return = (current price / start price) - 1</li>
-                    </ul>
-                    Portfolio and benchmark stay aligned on identical timestamps.
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-white font-medium mb-1">What's Included</div>
-                  <ul className="text-gray-300 space-y-1 text-xs ml-4 list-disc">
-                    <li><strong>Realized gains</strong>: Profit/loss from completed sales</li>
-                    <li><strong>Unrealized gains</strong>: Current holdings value change</li>
-                    <li><strong>Cash flows</strong>: All deposits (buys) and withdrawals (sells)</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <div className="text-white font-medium mb-1">Price Dates</div>
-                  <ul className="text-gray-300 space-y-1 text-xs ml-4 list-disc">
-                    <li><strong>Yearly</strong>: Prices from Jan 1 (start) and Dec 31 (end)</li>
-                    <li><strong>All-Time</strong>: Prices from first transaction date and today</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <div className="text-white font-medium mb-1">How Multiple Purchases Work</div>
-                  <div className="text-gray-300 text-xs bg-white/[0.02] p-2 rounded-lg border border-white/5">
-                    <strong>Example:</strong> You own 10 AAPL shares on Jan 1, then buy 5 more in March
-                    <ul className="mt-1 ml-4 list-disc space-y-0.5">
-                      <li>Beginning: 10 shares × Jan 1 price</li>
-                      <li>Invested: 5 shares × <em>actual March purchase price</em></li>
-                      <li>Ending: 15 shares × Dec 31 price</li>
-                    </ul>
-                    <div className="mt-1.5 text-gray-500">
-                      ✓ Gain correctly includes both old shares (Jan→Dec) and new shares (Mar→Dec)
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-gray-500 text-xs pt-2 border-t border-white/5">
-                  <strong>Note:</strong> Multi-currency portfolio ($ and €). Each ticker in native currency, total in EUR.
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+      <div>
+        <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-heading">Performance</h2>
+        <p className="mt-1 text-sm text-gray-500">Return, benchmark, cash flow, and ticker drivers.</p>
       </div>
 
       {/* Year Tabs */}
@@ -728,7 +717,11 @@ export const AnnualPerformanceReport: React.FC = () => {
 
       {/* Summary Card */}
       {selectedData.data ? (
-        <YearSummaryCard data={selectedData.data} />
+        <YearSummaryCard
+          data={selectedData.data}
+          periodLabel={selectedTab === 'all-time' ? 'All time' : selectedTab}
+          benchmark={benchmarkSnapshot}
+        />
       ) : (
         <div className="glass rounded-xl p-6">
           <p className="text-gray-500 text-center">No performance data available for this period</p>
@@ -750,6 +743,27 @@ export const AnnualPerformanceReport: React.FC = () => {
         />
       ) : null}
 
+      <PerformanceDrivers tickers={driverTickers} label={driverLabel} />
+
+      <details className="rounded-xl border border-white/10 bg-surface-dark/80">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-white">How performance is calculated</summary>
+        <div className="space-y-3 border-t border-white/5 px-4 py-4 text-sm text-gray-300">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Gain</p>
+              <p className="mt-2 font-mono text-xs text-gray-300">Ending Balance + Withdrawn - Beginning Balance - Invested</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Return</p>
+              <p className="mt-2 font-mono text-xs text-gray-300">Total Gain / Total Invested × 100</p>
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-gray-500">
+            Benchmark uses SXR8.DE on the same valuation dates as your portfolio. Ticker gains are shown in native currency, while total gain is converted to EUR.
+          </p>
+        </div>
+      </details>
+
       {/* Per-Ticker Breakdown (only for individual years) */}
       {selectedData.isYear && selectedData.data && 'tickers' in selectedData.data && Array.isArray(selectedData.data.tickers) && selectedData.data.tickers.length > 0 && (
         <div className="space-y-4">
@@ -763,7 +777,11 @@ export const AnnualPerformanceReport: React.FC = () => {
                 aria-expanded={isTickerTipOpen}
                 className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 bg-surface/40 transition-colors"
               >
-                <span className="text-sm leading-none">💡</span>
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4" />
+                  <path d="M12 8h.01" />
+                </svg>
               </button>
 
               {isTickerTipOpen && (
