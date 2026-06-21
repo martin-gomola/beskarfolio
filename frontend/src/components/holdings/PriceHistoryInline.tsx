@@ -61,6 +61,15 @@ const formatTooltipDate = (date: string, showYear: boolean): string => {
   )
 }
 
+const formatTooltipMonthDay = (date: string): string => {
+  const d = parsePriceDate(date)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const formatTooltipYear = (date: string): string => {
+  return parsePriceDate(date).getFullYear().toString()
+}
+
 export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, currency }) => {
   const [priceData, setPriceData] = useState<PricePoint[]>([])
   const [loading, setLoading] = useState(true)
@@ -236,7 +245,12 @@ export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, 
       const data = payload[0].payload
       return (
         <div className="bg-surface-elevated border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
-          <p className="text-gray-400 text-xs">{formatTooltipDate(data.date, shouldShowYearOnDates)}</p>
+          <p className="flex items-baseline gap-1.5 text-gray-400">
+            <span className="text-xs">{formatTooltipMonthDay(data.date)}</span>
+            {shouldShowYearOnDates && (
+              <span className="text-[10px] font-medium text-gray-500">{formatTooltipYear(data.date)}</span>
+            )}
+          </p>
           <p className="text-white font-semibold">{formatCurrency(data.close, currency)}</p>
         </div>
       )
