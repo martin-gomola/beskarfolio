@@ -10,6 +10,12 @@ from unittest.mock import patch
 import pandas as pd
 
 from logic.prices.history import ensure_historical_prices_with_timeout
+from logic.prices.read_model import (
+    get_52week_ranges,
+    get_all_latest_prices,
+    get_price_range,
+    get_price_status,
+)
 from logic.prices.service import get_historical_file_status_for_ticker, get_latest_price
 from logic.prices.storage import CSVStorageManager, PricePersistenceError
 from config import settings
@@ -99,6 +105,39 @@ class PriceHistoryTests(unittest.TestCase):
         self.assertEqual(latest_price["date"], "2024-01-08")
         self.assertEqual(latest_price["source"], "api_snapshot")
         self.assertLess(latest_price["fetch_age_hours"], 1.0)
+
+    def test_price_read_model_projects_cached_price_views(self) -> None:
+        self._write_csv(
+            "AAPL",
+            [
+                "2023-01-01,90.00",
+                "2024-01-01,100.00",
+                "2024-01-02,110.00",
+            ],
+        )
+
+        latest_prices = get_all_latest_prices()
+        price_range = get_price_range("aapl", "2024-01-01", "2024-01-02")
+        week_ranges = get_52week_ranges()
+        status = get_price_status(
+            details=True,
+            prices={
+                "AAPL": {
+                    "price": 110.0,
+                    "currency": "USD",
+                    "date": "2024-01-02",
+                    "age_hours": 500,
+                    "fetch_age_hours": 0.5,
+                }
+            },
+        )
+
+        self.assertEqual(latest_prices["AAPL"]["price"], 110.0)
+        self.assertEqual([row["close"] for row in price_range], [100.0, 110.0])
+        self.assertEqual(week_ranges["AAPL"]["high"], 110.0)
+        self.assertEqual(week_ranges["AAPL"]["low"], 100.0)
+        self.assertEqual(status["status_counts"], {"cached": 1, "recent": 0, "stale": 0})
+        self.assertEqual(status["prices"][0]["status"], "cached")
 
     def test_save_historical_dataframe_normalizes_same_day_duplicates(self) -> None:
         df = pd.DataFrame(

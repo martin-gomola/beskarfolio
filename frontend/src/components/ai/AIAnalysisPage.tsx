@@ -34,18 +34,10 @@ interface AIAnalysisPageProps {
   onNavigateToTab?: (tab: 'settings') => void
 }
 
-const PROMPT_GROUPS = [
-  {
-    id: 'popular' as const,
-    title: 'Most useful',
-    description: 'Quick reads for everyday portfolio decisions.',
-  },
-  {
-    id: 'advanced' as const,
-    title: 'Focused tools',
-    description: 'Narrow prompts when you need one clean answer.',
-  },
-]
+const PROMPT_LIBRARY = {
+  title: 'Most useful',
+  description: 'Quick reads and focused tools for everyday portfolio decisions.',
+}
 
 const DEPTH_OPTIONS: { value: PromptDepth; label: string }[] = [
   { value: 'simple', label: 'Simple' },
@@ -140,13 +132,6 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
     if (!selectedTicker) return 0
     return transactions.filter(t => t.ticker.toUpperCase() === selectedTicker.toUpperCase()).length
   }, [selectedTicker, transactions])
-
-  const promptGroups = useMemo(() => (
-    PROMPT_GROUPS.map(group => ({
-      ...group,
-      prompts: ALL_PROMPTS.filter(promptDefinition => promptDefinition.category === group.id),
-    }))
-  ), [])
 
   const recommendedPrompt = PROMPTS_BY_ID.analysis
   const hasTaxContext = taxFreeData !== null
@@ -568,47 +553,38 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
 
       {promptControls}
 
-      <div className="space-y-4 sm:space-y-6">
-        {promptGroups.map(group => (
-          <section key={group.id} className="space-y-3">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-white">{group.title}</h3>
-                <p className="text-xs sm:text-sm text-gray-500">{group.description}</p>
-              </div>
-            </div>
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold text-white">{PROMPT_LIBRARY.title}</h3>
+          <p className="text-xs sm:text-sm text-gray-500">{PROMPT_LIBRARY.description}</p>
+        </div>
 
-            <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {group.prompts.map((promptDefinition) => {
-                const PromptIcon = promptDefinition.icon
-                return (
-                  <button
-                    key={promptDefinition.id}
-                    onClick={() => handleSelectQuestion(promptDefinition.id)}
-                    className="group min-h-[124px] sm:min-h-[160px] rounded-lg border border-white/10 bg-surface-dark/80 p-3.5 sm:p-4 text-left transition-colors hover:border-accent-500/35 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400 focus-visible:outline-offset-2"
-                  >
-                    <div className="flex h-full flex-col">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg border border-accent-500/20 bg-accent-500/10">
-                          <PromptIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-accent-300" aria-hidden="true" />
-                        </span>
-                        <ArrowRight className="mt-1 h-4 w-4 text-gray-600 transition-colors group-hover:text-accent-300" aria-hidden="true" />
-                      </div>
-                      <div className="mt-3 sm:mt-4 flex-1">
-                        <h4 className="text-base font-semibold leading-snug text-white">{promptDefinition.question}</h4>
-                        <p className="mt-1.5 sm:mt-2 text-sm leading-relaxed text-gray-400">{promptDefinition.description}</p>
-                      </div>
-                      <p className="mt-3 sm:mt-4 text-xs font-medium uppercase tracking-wide text-gray-600">
-                        {promptDefinition.category === 'popular' ? 'Everyday' : 'Advanced'}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </section>
-        ))}
-      </div>
+        <div className="grid gap-2.5 sm:gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {ALL_PROMPTS.map((promptDefinition) => {
+            const PromptIcon = promptDefinition.icon
+            return (
+              <button
+                key={promptDefinition.id}
+                onClick={() => handleSelectQuestion(promptDefinition.id)}
+                className="group min-h-[124px] sm:min-h-[144px] rounded-lg border border-white/10 bg-surface-dark/80 p-3.5 sm:p-4 text-left transition-colors hover:border-accent-500/35 hover:bg-white/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400 focus-visible:outline-offset-2"
+              >
+                <div className="flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg border border-accent-500/20 bg-accent-500/10">
+                      <PromptIcon className="h-4.5 w-4.5 sm:h-5 sm:w-5 text-accent-300" aria-hidden="true" />
+                    </span>
+                    <ArrowRight className="mt-1 h-4 w-4 text-gray-600 transition-colors group-hover:text-accent-300" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 sm:mt-4">
+                    <h4 className="text-base font-semibold leading-snug text-white">{promptDefinition.question}</h4>
+                    <p className="mt-1.5 sm:mt-2 text-sm leading-relaxed text-gray-400">{promptDefinition.description}</p>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
       <div className="rounded-lg border border-white/10 bg-surface-dark/70 p-4 text-center">
         <p className="text-gray-400 text-xs">

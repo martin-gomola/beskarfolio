@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Holding } from '../../types'
-import { formatCurrency } from '../../utils'
+import { formatCurrency, HOLDINGS_COLUMNS_STORAGE_KEY } from '../../utils'
 import { useTableSort, usePrivacyMode, use52WeekRanges } from '../../hooks'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
 import { TickerActionsMenu } from './TickerActionsMenu'
@@ -23,8 +23,6 @@ interface VisibleColumns {
   value: boolean
   return: boolean
 }
-
-const STORAGE_KEY = 'beskarfolio_holdings_visible_columns'
 
 const DEFAULT_COLUMNS: VisibleColumns = {
   shares: true,
@@ -51,13 +49,13 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
   
   // Load visible columns from localStorage or use defaults
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = localStorage.getItem(HOLDINGS_COLUMNS_STORAGE_KEY)
     return stored ? JSON.parse(stored) : DEFAULT_COLUMNS
   })
   
   // Save visible columns to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns))
+    localStorage.setItem(HOLDINGS_COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns))
   }, [visibleColumns])
   
   const toggleColumn = (column: ColumnKey) => {
@@ -180,7 +178,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
             <h2 className="text-lg font-semibold text-white tracking-tight font-heading">Holdings</h2>
             
             {/* Column Selector */}
-            <div className="relative">
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setShowColumnSelector(!showColumnSelector)}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all"
@@ -290,7 +288,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
           </div>
 
           {/* Search Bar */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/>
@@ -314,11 +312,96 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
                 </button>
               )}
             </div>
-            <span className="text-sm text-gray-400 whitespace-nowrap">{filteredHoldings.length} of {holdings.length}</span>
+            <span className="text-xs sm:text-sm text-gray-400 whitespace-nowrap">{filteredHoldings.length} of {holdings.length}</span>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="md:hidden divide-y divide-white/5">
+          {filteredHoldings.map((holding) => {
+            const returnColor = getReturnColor(holding)
+            const returnBg = getReturnBackground(holding)
+            const isExpanded = expandedTicker === holding.ticker
+
+            return (
+              <div key={holding.ticker} className={`${isExpanded ? 'bg-white/[0.02]' : ''}`}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="w-full px-3 py-4 text-left transition-colors hover:bg-white/[0.02] focus:outline-none focus:ring-2 focus:ring-accent-500/40 btn-press"
+                  onClick={() => setExpandedTicker(isExpanded ? null : holding.ticker)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setExpandedTicker(isExpanded ? null : holding.ticker)
+                    }
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <svg
+                          className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span className="truncate text-base font-semibold text-gray-100">{holding.ticker}</span>
+                        <FiftyTwoWeekChip
+                          currentPrice={holding.current_price}
+                          range={weekRanges[holding.ticker]}
+                        />
+                      </div>
+                      <div className="mt-1 pl-6 text-xs text-gray-500">
+                        {isPrivate ? PRIVACY_MASK : `${holding.shares.toFixed(2)} shares`}
+                      </div>
+                    </div>
+
+                    <div onClick={(event) => event.stopPropagation()}>
+                      <TickerActionsMenu
+                        ticker={holding.ticker}
+                        onViewTransactions={() => setSelectedTicker(holding.ticker)}
+                        onViewPriceHistory={() => setExpandedTicker(isExpanded ? null : holding.ticker)}
+                        onHoldingRemoved={onUpdate}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-3 pl-6">
+                    <div>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Price</div>
+                      <div className="mt-1 text-sm font-medium text-gray-300">{renderPriceCell(holding)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Value</div>
+                      <div className="mt-1 text-sm font-medium text-gray-100">{renderValueCell(holding)}</div>
+                    </div>
+                  </div>
+
+                  <div className={`mt-4 rounded-xl px-3 py-3 ${returnBg}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Return</div>
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${returnBg} ${returnColor}`}>
+                        {renderReturnPercent(holding)}
+                      </span>
+                    </div>
+                    <div className={`mt-1 max-w-full break-words text-right font-semibold leading-tight tracking-tight ${isPrivate ? 'text-gray-500' : returnColor} text-[clamp(1.05rem,5.2vw,1.35rem)]`}>
+                      {renderReturnValue(holding)}
+                    </div>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="border-t border-white/5">
+                    <PriceHistoryInline ticker={holding.ticker} currency={holding.currency} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-black/20 border-b border-white/5">

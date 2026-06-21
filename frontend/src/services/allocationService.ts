@@ -5,15 +5,13 @@
 
 import { api } from './api'
 import { loadGuestTransactions } from '../utils/guestStorage'
+import { TARGET_ALLOCATION_STORAGE_KEY } from '../utils/storageKeys'
 import type { TargetAllocation, AllocationStatus, RebalancePlan, RebalancePlanRequest } from '../types/allocation'
-
-// LocalStorage key for target allocations
-const ALLOCATION_STORAGE_KEY = 'beskarfolio_guest_target_allocation'
 
 // Helper functions for localStorage
 const loadTargetAllocation = (): TargetAllocation | null => {
   try {
-    const stored = localStorage.getItem(ALLOCATION_STORAGE_KEY)
+    const stored = localStorage.getItem(TARGET_ALLOCATION_STORAGE_KEY)
     if (!stored) return null
     return JSON.parse(stored)
   } catch (err) {
@@ -24,7 +22,7 @@ const loadTargetAllocation = (): TargetAllocation | null => {
 
 const saveTargetAllocation = (allocations: TargetAllocation): void => {
   try {
-    localStorage.setItem(ALLOCATION_STORAGE_KEY, JSON.stringify(allocations))
+    localStorage.setItem(TARGET_ALLOCATION_STORAGE_KEY, JSON.stringify(allocations))
   } catch (err) {
     console.error('Failed to save target allocation:', err)
   }

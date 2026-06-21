@@ -1,8 +1,6 @@
 import { Holding, PortfolioSummary } from '../../types'
 
-// LocalStorage keys
-export const TICKER_INFO_CACHE_KEY = 'beskarfolio_ticker_info_cache'
-export const AI_SETTINGS_KEY = 'beskarfolio_ai_settings'
+export { AI_SETTINGS_KEY, TICKER_INFO_CACHE_KEY } from '../../utils/storageKeys'
 
 export interface TickerInfo {
   sector?: string

@@ -26,7 +26,13 @@ from logic.models import (
     PriceStatusResponse,
     PriceUpdateRequest,
 )
-from logic.prices.shared import get_effective_currency_for_ticker, get_market_date_for_ticker
+from logic.prices.read_model import (
+    get_52week_ranges,
+    get_all_latest_prices,
+    get_price_range,
+    get_price_status,
+)
+from logic.prices.shared import get_market_date_for_ticker
 from logic.prices.orchestrator import PriceOrchestrator
 from logic.prices.service import (
     finalize_daily_close,
@@ -41,32 +47,6 @@ from logic.prices.storage import CSVStorageManager, PricePersistenceError, list_
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ============================================================================
-# OPTIMIZED LATEST PRICES (precomputed, minimal payload)
-# ============================================================================
-
-def _get_all_latest_prices() -> Dict[str, Dict[str, Any]]:
-    """
-    Get all latest prices from intraday snapshots, falling back to daily-close CSV files.
-    Returns minimal payload: {ticker: {price, date, currency}}
-    
-    Uses CSVStorageManager's mtime-based cache internally.
-    """
-    tickers = list_historical_tickers()
-    result = {}
-    
-    for ticker in tickers:
-        latest = get_latest_price(ticker)
-        if latest:
-            result[ticker] = {
-                "price": latest['price'],
-                "date": latest['date'],
-                "currency": get_effective_currency_for_ticker(ticker)
-            }
-    
-    return result
 
 
 @router.get("/api/prices/latest", response_model=Dict[str, LatestPriceItem])
@@ -85,7 +65,7 @@ async def latest_prices():
     }
     """
     try:
-        prices = _get_all_latest_prices()
+        prices = get_all_latest_prices()
         return prices
     except Exception as e:
         raise_unexpected_error(logger, "Error getting latest prices", e, str(e))
@@ -114,30 +94,12 @@ async def prices_range(
     ]
     """
     try:
-        ticker = ticker.upper().strip()
-        entry = CSVStorageManager.load_cached_series(ticker)
-        
-        if not entry:
-            raise HTTPException(status_code=404, detail=f"No price data for {ticker}")
-        
-        from datetime import datetime
-        
-        # Parse dates
-        from_dt = datetime.strptime(from_date, "%Y-%m-%d").date()
-        to_dt = datetime.strptime(to_date, "%Y-%m-%d").date() if to_date else datetime.now().date()
-        
-        # Filter by date range
-        result = []
-        for i, d in enumerate(entry.dates_only):
-            if from_dt <= d <= to_dt:
-                result.append({
-                    "date": d.isoformat(),
-                    "close": entry.closes[i]
-                })
-        
-        return result
-    except HTTPException:
-        raise
+        return get_price_range(ticker, from_date, to_date)
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No price data for {ticker.upper().strip()}",
+        )
     except Exception as e:
         raise_unexpected_error(logger, f"Error getting price range for {ticker}", e, str(e))
 
@@ -159,34 +121,7 @@ async def prices_52week_range() -> Dict[str, Dict[str, Any]]:
     Tickers with no cached history are omitted from the response.
     """
     try:
-        from datetime import timedelta
-
-        tickers = list_historical_tickers()
-        result: Dict[str, Dict[str, Any]] = {}
-
-        for ticker in tickers:
-            entry = CSVStorageManager.load_cached_series(ticker)
-            if not entry or not entry.dates_only or not entry.closes:
-                continue
-
-            as_of = entry.dates_only[-1]
-            window_start = as_of - timedelta(days=365)
-
-            window_closes = [
-                c for d, c in zip(entry.dates_only, entry.closes)
-                if window_start <= d <= as_of and c is not None
-            ]
-            if not window_closes:
-                continue
-
-            result[ticker] = {
-                "high": float(max(window_closes)),
-                "low": float(min(window_closes)),
-                "as_of": as_of.isoformat(),
-                "currency": get_effective_currency_for_ticker(ticker),
-            }
-
-        return result
+        return get_52week_ranges()
     except Exception as e:
         raise_unexpected_error(logger, "Error computing 52-week ranges", e, str(e))
 
@@ -206,81 +141,8 @@ async def prices_status(details: bool = False) -> PriceStatusResponse:
     - status_counts: {cached, recent, stale} counts
     - prices: (only if details=true) full ticker list
     """
-    import os
-    from datetime import datetime, timezone
-
     try:
-        prices = get_all_prices()
-
-        if not prices:
-            return {
-                "has_prices": False,
-                "last_update": None,
-                "prices_count": 0,
-                "status_counts": {"cached": 0, "recent": 0, "stale": 0}
-            }
-
-        status_counts = {"cached": 0, "recent": 0, "stale": 0}
-        most_recent_update = None
-        ticker_details = [] if details else None
-        cache_threshold = settings.PRICE_CACHE_HOURS
-
-        for ticker, data in prices.items():
-            fetch_age_hours = data.get('fetch_age_hours')
-            if fetch_age_hours is None:
-                fetch_age_hours = data['age_hours']
-
-            fetched_at_raw = data.get('fetched_at')
-            if fetched_at_raw:
-                try:
-                    fetched_at = datetime.fromisoformat(fetched_at_raw)
-                    if fetched_at.tzinfo is None:
-                        fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-                    if most_recent_update is None or fetched_at > most_recent_update:
-                        most_recent_update = fetched_at
-                except ValueError:
-                    pass
-            else:
-                csv_path = settings.get_historical_price_path(ticker)
-                if os.path.exists(csv_path):
-                    mtime = os.path.getmtime(csv_path)
-                    file_modified = datetime.fromtimestamp(mtime, tz=timezone.utc)
-                    if most_recent_update is None or file_modified > most_recent_update:
-                        most_recent_update = file_modified
-
-            # Determine freshness based on when we last fetched the file.
-            if fetch_age_hours < cache_threshold:
-                status = 'cached'
-            elif fetch_age_hours < 24:
-                status = 'recent'
-            else:
-                status = 'stale'
-
-            status_counts[status] += 1
-
-            # Only build full list if requested
-            if details:
-                ticker_details.append({
-                    'ticker': ticker,
-                    'price': data['price'],
-                    'currency': data['currency'],
-                    'updated_at': data.get('fetched_at') or data['date'],
-                    'age_hours': round(fetch_age_hours, 1),
-                    'price_date': data['date'],
-                    'status': status
-                })
-
-        response = {
-            "has_prices": True,
-            "last_update": most_recent_update.isoformat() if most_recent_update else None,
-            "prices_count": len(prices),
-            "status_counts": status_counts
-        }
-
-        if details:
-            response["prices"] = ticker_details
-
-        return response
+        return get_price_status(details=details, prices=get_all_prices())
     except Exception as e:
         raise_unexpected_error(logger, "Error getting price status", e, str(e))
 

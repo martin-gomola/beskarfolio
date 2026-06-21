@@ -11,15 +11,15 @@
 import { Transaction } from '../types/transaction'
 import { loadGuestTransactions, saveGuestTransactions, loadGuestPrices, saveGuestPrices, normalizeDate, type PriceData } from './guestStorage'
 import { GUEST_STORAGE_KEY } from './constants'
+import {
+  ALLOCATION_COLUMNS_STORAGE_KEY,
+  HOLDINGS_COLUMNS_STORAGE_KEY,
+  TARGET_ALLOCATION_STORAGE_KEY,
+  TICKER_INFO_CACHE_KEY,
+} from './storageKeys'
 
 // Current backup format version
 export const BACKUP_VERSION = 3
-
-// Storage keys for export
-const ALLOCATION_KEY = 'beskarfolio_guest_target_allocation'
-const HOLDINGS_COLUMNS_KEY = 'beskarfolio_holdings_visible_columns'
-const ALLOCATION_COLUMNS_KEY = 'beskarfolio_allocation_visible_columns'
-const TICKER_INFO_CACHE_KEY = 'beskarfolio_ticker_info_cache'
 
 // ============================================================================
 // Types
@@ -309,7 +309,7 @@ export function createBackup(appVersion?: string): BackupData {
   // Load target allocations
   let targetAllocations: Record<string, number> | null = null
   try {
-    const stored = localStorage.getItem(ALLOCATION_KEY)
+    const stored = localStorage.getItem(TARGET_ALLOCATION_STORAGE_KEY)
     if (stored) targetAllocations = JSON.parse(stored)
   } catch (e) {
     console.warn('Failed to load target allocations:', e)
@@ -334,10 +334,10 @@ export function createBackup(appVersion?: string): BackupData {
   // Load settings
   const settings: BackupData['settings'] = {}
   try {
-    const holdingsColumns = localStorage.getItem(HOLDINGS_COLUMNS_KEY)
+    const holdingsColumns = localStorage.getItem(HOLDINGS_COLUMNS_STORAGE_KEY)
     if (holdingsColumns) settings.holdingsVisibleColumns = JSON.parse(holdingsColumns)
     
-    const allocationColumns = localStorage.getItem(ALLOCATION_COLUMNS_KEY)
+    const allocationColumns = localStorage.getItem(ALLOCATION_COLUMNS_STORAGE_KEY)
     if (allocationColumns) settings.allocationVisibleColumns = JSON.parse(allocationColumns)
   } catch (e) {
     console.warn('Failed to load settings:', e)
@@ -513,7 +513,7 @@ export function importBackup(backup: BackupData, options: ImportOptions = {}): {
     
     // Import allocations
     if (importAllocations && backup.targetAllocations) {
-      localStorage.setItem(ALLOCATION_KEY, JSON.stringify(backup.targetAllocations))
+      localStorage.setItem(TARGET_ALLOCATION_STORAGE_KEY, JSON.stringify(backup.targetAllocations))
       imported.push('target allocations')
     }
     
@@ -532,11 +532,11 @@ export function importBackup(backup: BackupData, options: ImportOptions = {}): {
     // Import settings
     if (importSettings && backup.settings) {
       if (backup.settings.holdingsVisibleColumns) {
-        localStorage.setItem(HOLDINGS_COLUMNS_KEY, JSON.stringify(backup.settings.holdingsVisibleColumns))
+        localStorage.setItem(HOLDINGS_COLUMNS_STORAGE_KEY, JSON.stringify(backup.settings.holdingsVisibleColumns))
         imported.push('holdings column settings')
       }
       if (backup.settings.allocationVisibleColumns) {
-        localStorage.setItem(ALLOCATION_COLUMNS_KEY, JSON.stringify(backup.settings.allocationVisibleColumns))
+        localStorage.setItem(ALLOCATION_COLUMNS_STORAGE_KEY, JSON.stringify(backup.settings.allocationVisibleColumns))
         imported.push('allocation column settings')
       }
     }

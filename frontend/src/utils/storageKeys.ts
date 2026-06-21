@@ -1,0 +1,5 @@
+export const TARGET_ALLOCATION_STORAGE_KEY = 'beskarfolio_guest_target_allocation'
+export const TICKER_INFO_CACHE_KEY = 'beskarfolio_ticker_info_cache'
+export const AI_SETTINGS_KEY = 'beskarfolio_ai_settings'
+export const HOLDINGS_COLUMNS_STORAGE_KEY = 'beskarfolio_holdings_visible_columns'
+export const ALLOCATION_COLUMNS_STORAGE_KEY = 'beskarfolio_allocation_visible_columns'

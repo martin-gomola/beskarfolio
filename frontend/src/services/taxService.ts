@@ -1,6 +1,5 @@
-import { api } from './api'
 import { TaxFreeHolding } from '../types'
-import { loadGuestTransactions } from '../utils/guestStorage'
+import { readBrowserTaxFreeHoldings } from './browserPortfolioState'
 
 /**
  * Tax Service
@@ -13,14 +12,7 @@ export const taxService = {
    */
   getTaxFreeHoldings: async (): Promise<TaxFreeHolding[]> => {
     try {
-      const transactions = loadGuestTransactions()
-
-      if (transactions.length === 0) {
-        return []
-      }
-
-      const response = await api.post('/api/tax-free', { transactions })
-      return response.data.tax_free_holdings || []
+      return await readBrowserTaxFreeHoldings()
     } catch (error) {
       console.error('Failed to fetch tax-free data:', error)
       return []

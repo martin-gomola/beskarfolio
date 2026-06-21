@@ -22,8 +22,7 @@
  * "Model Context Tool Inspector" extension, open the app, and the side panel
  * will list/execute these tools.
  */
-import { api } from '../services/api'
-import { loadGuestTransactions } from './guestStorage'
+import { readBrowserPortfolio, readBrowserTransactions } from '../services/browserPortfolioState'
 import type { Holding } from '../types/holding'
 import type { PortfolioSummary } from '../types/portfolio'
 
@@ -57,31 +56,11 @@ function jsonResult(value: unknown): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(value) }] }
 }
 
-/**
- * Compute the visitor's holdings + summary via the existing stateless backend.
- * Reuses the same endpoint the app itself uses so the agent sees identical,
- * FIFO-accurate numbers without re-implementing the math here.
- */
 async function calculatePortfolio(): Promise<CalculateResponse> {
-  const transactions = loadGuestTransactions()
-  if (transactions.length === 0) {
-    return {
-      summary: {
-        success: true,
-        transaction_count: 0,
-        total_value: 0,
-        total_invested: 0,
-        total_gain_loss: 0,
-        total_gain_loss_pct: 0,
-        holdings_count: 0,
-      },
-      holdings: [],
-    }
-  }
-  const response = await api.post('/api/portfolio/calculate', transactions)
+  const snapshot = await readBrowserPortfolio()
   return {
-    summary: response.data.summary,
-    holdings: response.data.holdings || [],
+    summary: snapshot.summary,
+    holdings: snapshot.holdings,
   }
 }
 
@@ -146,7 +125,7 @@ function buildTools(): ToolDefinition[] {
         },
       },
       execute: async (args) => {
-        const transactions = loadGuestTransactions()
+        const transactions = readBrowserTransactions()
         const ticker = typeof args.ticker === 'string' ? args.ticker.toUpperCase().trim() : ''
         const limit =
           typeof args.limit === 'number' && args.limit > 0 ? Math.floor(args.limit) : 20
