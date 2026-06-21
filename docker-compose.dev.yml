@@ -37,6 +37,10 @@ services:
 
   # Frontend with volume mounts for live reload
   frontend:
+    # Keep the Vite dev image separate from the production nginx image.
+    # Otherwise `make dev` can reuse beskarfolio-frontend:latest and try to
+    # run `npm` inside nginx, which fails because npm is not installed there.
+    image: beskarfolio-frontend-dev
     build:
       context: ./frontend
       dockerfile: Dockerfile

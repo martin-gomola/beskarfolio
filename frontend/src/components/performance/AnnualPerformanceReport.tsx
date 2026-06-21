@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { ArrowDownRight, ArrowUpRight, Landmark, Minus, Target, TrendingUp } from 'lucide-react'
 import { useAnnualPerformance } from '../../hooks/useAnnualPerformance'
 import { AllTimePerformance, PerformanceChartPoint, YearPerformance, TickerBreakdown } from '../../types'
 import { usePrivacyMode } from '../../hooks'
@@ -65,6 +66,8 @@ interface BenchmarkSnapshot {
   delta: number
 }
 
+type ComparisonTone = 'gain' | 'loss' | 'neutral'
+
 const formatBenchmarkLabel = (benchmark?: BenchmarkSnapshot | null): string => {
   if (!benchmark) return 'Benchmark loading'
   if (benchmark.delta > 0) return `Ahead by ${formatPercent(benchmark.delta)}`
@@ -72,100 +75,238 @@ const formatBenchmarkLabel = (benchmark?: BenchmarkSnapshot | null): string => {
   return 'Matching benchmark'
 }
 
+interface BenchmarkMetricCardProps {
+  label: string
+  value: number | null
+  helper: string
+  detail: string
+  tone: ComparisonTone
+  maxAbsValue: number
+  icon: React.ReactNode
+  isPrivate: boolean
+}
+
+const BenchmarkMetricCard: React.FC<BenchmarkMetricCardProps> = ({
+  label,
+  value,
+  helper,
+  detail,
+  tone,
+  maxAbsValue,
+  icon,
+  isPrivate,
+}) => {
+  const hasValue = value !== null
+  const barWidth = hasValue
+    ? Math.max(8, Math.min(100, (Math.abs(value) / Math.max(maxAbsValue, 1)) * 100))
+    : 38
+  const toneClass = tone === 'gain'
+    ? 'text-gain'
+    : tone === 'loss'
+      ? 'text-loss'
+      : 'text-gray-200'
+  const barClass = tone === 'gain'
+    ? 'bg-gain'
+    : tone === 'loss'
+      ? 'bg-loss'
+      : 'bg-gray-400'
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+          <p className="mt-1 text-xs text-gray-500">{helper}</p>
+        </div>
+        <div className={`rounded-full border border-white/10 bg-black/20 p-2 ${toneClass}`}>
+          {icon}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-4">
+        <p className={`text-2xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : toneClass}`}>
+          {isPrivate ? PRIVACY_MASK : hasValue ? formatPercent(value) : 'Loading'}
+        </p>
+        <p className="pb-1 text-right text-xs text-gray-500">{detail}</p>
+      </div>
+
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
+        <div
+          className={`h-full rounded-full ${hasValue ? barClass : 'animate-pulse bg-white/10'}`}
+          style={{ width: `${barWidth}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+interface CashFlowItemProps {
+  label: string
+  value: string
+  valueClassName?: string
+}
+
+const CashFlowItem: React.FC<CashFlowItemProps> = ({ label, value, valueClassName = 'text-gray-300' }) => (
+  <div className="min-w-0">
+    <p className="text-xs text-gray-500">{label}</p>
+    <p className={`mt-1 truncate text-sm font-medium sm:text-base ${valueClassName}`}>{value}</p>
+  </div>
+)
+
 const YearSummaryCard: React.FC<YearSummaryCardProps> = ({ data, periodLabel, benchmark }) => {
   const { isPrivate } = usePrivacyMode()
+  const portfolioReturn = benchmark?.portfolioReturn ?? data.total_gain_pct
+  const benchmarkReturn = benchmark?.benchmarkReturn ?? null
+  const delta = benchmark?.delta ?? null
+  const maxAbsBenchmarkValue = Math.max(
+    1,
+    Math.abs(portfolioReturn),
+    Math.abs(benchmarkReturn ?? 0),
+    Math.abs(delta ?? 0)
+  )
+  const deltaTone: ComparisonTone = !benchmark
+    ? 'neutral'
+    : benchmark.delta > 0
+      ? 'gain'
+      : benchmark.delta < 0
+        ? 'loss'
+        : 'neutral'
+  const benchmarkCards = [
+    {
+      label: 'Portfolio',
+      value: portfolioReturn,
+      helper: 'Your return',
+      detail: 'period result',
+      tone: portfolioReturn > 0 ? 'gain' as const : portfolioReturn < 0 ? 'loss' as const : 'neutral' as const,
+      icon: portfolioReturn > 0
+        ? <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+        : portfolioReturn < 0
+          ? <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
+          : <Minus className="h-4 w-4" aria-hidden="true" />,
+    },
+    {
+      label: 'SXR8.DE',
+      value: benchmarkReturn,
+      helper: 'Benchmark',
+      detail: benchmark ? 'same dates' : 'waiting for chart',
+      tone: (benchmarkReturn ?? 0) > 0 ? 'gain' as const : (benchmarkReturn ?? 0) < 0 ? 'loss' as const : 'neutral' as const,
+      icon: <Target className="h-4 w-4" aria-hidden="true" />,
+    },
+    {
+      label: 'Delta',
+      value: delta,
+      helper: 'Relative edge',
+      detail: benchmark ? 'portfolio minus benchmark' : 'waiting for chart',
+      tone: deltaTone,
+      icon: deltaTone === 'gain'
+        ? <TrendingUp className="h-4 w-4" aria-hidden="true" />
+        : deltaTone === 'loss'
+          ? <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
+          : <Minus className="h-4 w-4" aria-hidden="true" />,
+    },
+  ]
+
   return (
-    <section className="glass rounded-xl p-4 sm:p-6">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{periodLabel}</p>
-            <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-              benchmark && benchmark.delta >= 0
-                ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
-                : benchmark
-                  ? 'border-rose-500/25 bg-rose-500/10 text-rose-300'
-                  : 'border-white/10 bg-white/[0.03] text-gray-400'
-            }`}>
-              {formatBenchmarkLabel(benchmark)}
-            </span>
+    <section className="glass rounded-xl p-4 sm:p-5">
+      <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <div className="space-y-3">
+          <div className="rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.045] to-white/[0.015] p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{periodLabel}</p>
+              <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                benchmark && benchmark.delta >= 0
+                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+                  : benchmark
+                    ? 'border-rose-500/25 bg-rose-500/10 text-rose-300'
+                    : 'border-white/10 bg-white/[0.03] text-gray-400'
+              }`}>
+                {formatBenchmarkLabel(benchmark)}
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-5 md:grid-cols-[minmax(0,1fr)_220px] md:items-end">
+              <div>
+                <p className={`text-4xl sm:text-5xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain_pct)}`}>
+                  {isPrivate ? PRIVACY_MASK : formatPercent(data.total_gain_pct)}
+                </p>
+                <p className={`mt-2 text-lg sm:text-xl font-medium ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain)}`}>
+                  {isPrivate ? PRIVACY_MASK : `${formatCurrency(data.total_gain)} total gain`}
+                </p>
+                <p className="mt-3 text-sm text-gray-500">
+                  {formatDate(data.start_date)} - {formatDate(data.end_date)}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Landmark className="h-4 w-4" aria-hidden="true" />
+                  <p className="text-xs font-medium uppercase tracking-wide">Period value</p>
+                </div>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">{data.trade_count} trades recorded</p>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-5">
-            <p className={`text-4xl sm:text-5xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain_pct)}`}>
-              {isPrivate ? PRIVACY_MASK : formatPercent(data.total_gain_pct)}
-            </p>
-            <p className={`mt-2 text-lg sm:text-xl font-medium ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain)}`}>
-              {isPrivate ? PRIVACY_MASK : `${formatCurrency(data.total_gain)} total gain`}
-            </p>
-            <p className="mt-3 text-sm text-gray-500">
-              {formatDate(data.start_date)} - {formatDate(data.end_date)}
-            </p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Value</p>
+              <p className="mt-1 text-sm sm:text-lg font-semibold text-white">
+                {isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Net flow</p>
+              <p className={`mt-1 text-sm sm:text-lg font-semibold ${isPrivate ? 'text-gray-500' : data.net_deposits >= 0 ? 'text-accent-400' : 'text-amber-400'}`}>
+                {isPrivate ? PRIVACY_MASK : formatCurrency(data.net_deposits)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+              <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Trades</p>
+              <p className="mt-1 text-sm sm:text-lg font-semibold text-white">{data.trade_count}</p>
+            </div>
           </div>
+
+          <details className="rounded-lg border border-white/10 bg-black/15">
+            <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium text-gray-300">Cash flow details</summary>
+            <div className="grid gap-4 border-t border-white/5 px-3 py-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] sm:items-center">
+              <CashFlowItem label="Start" value={isPrivate ? PRIVACY_MASK : formatCurrency(data.beginning_balance)} />
+              <div className="hidden h-px w-8 bg-white/10 sm:block" />
+              <CashFlowItem
+                label="Invested"
+                value={isPrivate ? PRIVACY_MASK : formatCurrency(data.total_invested)}
+                valueClassName="text-accent-400"
+              />
+              <div className="hidden h-px w-8 bg-white/10 sm:block" />
+              <CashFlowItem
+                label="Withdrawn"
+                value={isPrivate ? PRIVACY_MASK : formatCurrency(data.total_withdrawn)}
+                valueClassName="text-amber-400"
+              />
+              <div className="hidden h-px w-8 bg-white/10 sm:block" />
+              <CashFlowItem label="End" value={isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)} />
+            </div>
+          </details>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Portfolio</p>
-            <p className={`mt-1 text-base sm:text-xl font-semibold ${isPrivate ? 'text-gray-500' : getGainColor(benchmark?.portfolioReturn ?? data.total_gain_pct)}`}>
-              {isPrivate ? PRIVACY_MASK : benchmark ? formatPercent(benchmark.portfolioReturn) : formatPercent(data.total_gain_pct)}
-            </p>
-          </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">SXR8.DE</p>
-            <p className="mt-1 text-base sm:text-xl font-semibold text-gray-300">
-              {isPrivate ? PRIVACY_MASK : benchmark ? formatPercent(benchmark.benchmarkReturn) : 'Loading'}
-            </p>
-          </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-            <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Delta</p>
-            <p className={`mt-1 text-base sm:text-xl font-semibold ${isPrivate ? 'text-gray-500' : getGainColor(benchmark?.delta ?? 0)}`}>
-              {isPrivate ? PRIVACY_MASK : benchmark ? formatPercent(benchmark.delta) : 'Loading'}
-            </p>
-          </div>
+        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
+          {benchmarkCards.map((card) => (
+            <BenchmarkMetricCard
+              key={card.label}
+              label={card.label}
+              value={card.value}
+              helper={card.helper}
+              detail={card.detail}
+              tone={card.tone}
+              maxAbsValue={maxAbsBenchmarkValue}
+              icon={card.icon}
+              isPrivate={isPrivate}
+            />
+          ))}
         </div>
       </div>
-
-      <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
-        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Value</p>
-          <p className="mt-1 text-sm sm:text-lg font-semibold text-white">
-            {isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Net flow</p>
-          <p className={`mt-1 text-sm sm:text-lg font-semibold ${isPrivate ? 'text-gray-500' : data.net_deposits >= 0 ? 'text-accent-400' : 'text-amber-400'}`}>
-            {isPrivate ? PRIVACY_MASK : formatCurrency(data.net_deposits)}
-          </p>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-          <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wide text-gray-500">Trades</p>
-          <p className="mt-1 text-sm sm:text-lg font-semibold text-white">{data.trade_count}</p>
-        </div>
-      </div>
-
-      <details className="mt-3 rounded-lg border border-white/10 bg-black/15">
-        <summary className="cursor-pointer px-3 py-2.5 text-sm font-medium text-gray-300">Cash flow details</summary>
-        <div className="grid grid-cols-2 gap-3 border-t border-white/5 px-3 py-3 text-sm sm:grid-cols-4">
-          <div>
-            <p className="text-xs text-gray-500">Start</p>
-            <p className="text-gray-300">{isPrivate ? PRIVACY_MASK : formatCurrency(data.beginning_balance)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Invested</p>
-            <p className="text-accent-400">{isPrivate ? PRIVACY_MASK : formatCurrency(data.total_invested)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Withdrawn</p>
-            <p className="text-amber-400">{isPrivate ? PRIVACY_MASK : formatCurrency(data.total_withdrawn)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">End</p>
-            <p className="text-gray-300">{isPrivate ? PRIVACY_MASK : formatCurrency(data.ending_balance)}</p>
-          </div>
-        </div>
-      </details>
     </section>
   )
 }
