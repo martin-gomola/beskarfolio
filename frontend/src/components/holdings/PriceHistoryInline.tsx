@@ -40,6 +40,27 @@ const TriangleDown = (props: any) => {
   )
 }
 
+const parsePriceDate = (date: string): Date => {
+  const [year, month, day] = date.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+const formatAxisDate = (date: string, showYear: boolean): string => {
+  const d = parsePriceDate(date)
+  return d.toLocaleDateString('en-US', showYear
+    ? { month: 'short', year: '2-digit' }
+    : { month: 'short', day: 'numeric' }
+  )
+}
+
+const formatTooltipDate = (date: string, showYear: boolean): string => {
+  const d = parsePriceDate(date)
+  return d.toLocaleDateString('en-US', showYear
+    ? { month: 'short', day: 'numeric', year: 'numeric' }
+    : { month: 'short', day: 'numeric' }
+  )
+}
+
 export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, currency }) => {
   const [priceData, setPriceData] = useState<PricePoint[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,7 +130,7 @@ export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, 
         const data = response.data.map((p: { date: string; close: number }) => ({
           date: p.date,
           close: p.close,
-          displayDate: new Date(p.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          displayDate: formatTooltipDate(p.date, period === 'ALL')
         }))
 
         setPriceData(data)
@@ -200,13 +221,22 @@ export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, 
     return boundaries.slice(1)
   }, [priceData])
 
+  const shouldShowYearOnDates = useMemo(() => {
+    if (period === 'ALL') return true
+    if (priceData.length < 2) return false
+
+    const first = parsePriceDate(priceData[0].date)
+    const last = parsePriceDate(priceData[priceData.length - 1].date)
+    return first.getFullYear() !== last.getFullYear()
+  }, [period, priceData])
+
   // Custom tooltip
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: PricePoint }> }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
         <div className="bg-surface-elevated border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
-          <p className="text-gray-400 text-xs">{data.displayDate || data.date}</p>
+          <p className="text-gray-400 text-xs">{formatTooltipDate(data.date, shouldShowYearOnDates)}</p>
           <p className="text-white font-semibold">{formatCurrency(data.close, currency)}</p>
         </div>
       )
@@ -256,7 +286,7 @@ export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, 
         ) : (
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={priceData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+              <LineChart data={priceData} margin={{ top: 18, right: 5, left: 0, bottom: 0 }}>
                 {/* Year separator lines */}
                 {yearBoundaries.map((boundary) => (
                   <ReferenceLine
@@ -274,16 +304,13 @@ export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, 
                 ))}
                 <XAxis
                   dataKey="date"
-                  tickFormatter={(date) => {
-                    const d = new Date(date)
-                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  }}
+                  tickFormatter={(date) => formatAxisDate(date, shouldShowYearOnDates)}
                   stroke="#6b7280"
                   fontSize={10}
                   tickLine={false}
                   axisLine={false}
                   interval="preserveStartEnd"
-                  minTickGap={50}
+                  minTickGap={shouldShowYearOnDates ? 64 : 50}
                 />
                 <YAxis
                   domain={['auto', 'auto']}
