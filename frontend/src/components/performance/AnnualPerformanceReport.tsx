@@ -816,9 +816,9 @@ export const AnnualPerformanceReport: React.FC = () => {
 
   const benchmarkSnapshot = latestBenchmarkPoint
     ? {
-        portfolioReturn: latestBenchmarkPoint.portfolio_return_pct ?? 0,
+        portfolioReturn: selectedData.data?.total_gain_pct ?? latestBenchmarkPoint.portfolio_return_pct ?? 0,
         benchmarkReturn: latestBenchmarkPoint.benchmark_return_pct ?? 0,
-        delta: (latestBenchmarkPoint.portfolio_return_pct ?? 0) - (latestBenchmarkPoint.benchmark_return_pct ?? 0),
+        delta: (selectedData.data?.total_gain_pct ?? latestBenchmarkPoint.portfolio_return_pct ?? 0) - (latestBenchmarkPoint.benchmark_return_pct ?? 0),
       }
     : null
 
