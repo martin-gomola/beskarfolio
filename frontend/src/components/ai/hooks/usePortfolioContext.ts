@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Holding, PortfolioSummary, TaxFreeHolding, Transaction } from '../../../types'
 import { TickerInfo, AISettings, PortfolioHolding, TICKER_INFO_CACHE_KEY } from '../types'
 import { TICKER_SECTORS, ETF_PATTERNS, HORIZON_LABELS, GOAL_LABELS } from '../constants'
-import { DEFAULT_PROMPT_OPTIONS, PromptContext, PromptOptions } from '../prompts/types'
+import { DEFAULT_PROMPT_OPTIONS, ExchangeRateContext, PromptContext, PromptOptions } from '../prompts/types'
 
 const loadTickerInfoCache = (): Record<string, TickerInfo> => {
   try {
@@ -42,12 +42,23 @@ const buildTaxFreeSection = (taxFreeData: TaxFreeHolding[]): string => {
 ${lines.join('\n')}`
 }
 
+const buildDataNotesSection = (exchangeRates: ExchangeRateContext | null): string => {
+  const exchangeRateLine = exchangeRates
+    ? `- FX rate: USD -> EUR ${exchangeRates.usdEur.toFixed(4)}, EUR -> USD ${exchangeRates.eurUsd.toFixed(4)}${exchangeRates.updatedAt ? `, updated ${exchangeRates.updatedAt}` : ''} (source: ${exchangeRates.source}).`
+    : '- FX rate: The exact EUR/USD rate used to convert US holdings is missing; do not estimate it and verify it before doing currency-sensitive calculations.'
+
+  return `### Data Notes / Assumptions:
+- Current market prices: The table includes each holding's current price in its native currency, but prices may be cached, stale, or estimated; verify exact live market prices before trading.
+${exchangeRateLine}`
+}
+
 export function usePortfolioContext(
   holdings: Holding[],
   summary: PortfolioSummary | null,
   settings: AISettings,
   taxFreeData?: TaxFreeHolding[] | null,
   transactions: Transaction[] = [],
+  exchangeRates: ExchangeRateContext | null = null,
   selectedTicker = '',
   replacementTicker = '',
   promptOptions: PromptOptions = DEFAULT_PROMPT_OPTIONS
@@ -71,7 +82,9 @@ export function usePortfolioContext(
         gainLossPercent: h.gain_loss_pct || 0,
         currency: h.currency || 'EUR',
         sector: getSector(h.ticker, tickerCache),
-        region: getRegion(h.ticker, tickerCache)
+        region: getRegion(h.ticker, tickerCache),
+        priceStatus: h.price_status,
+        priceNote: h.price_note,
       }))
       .sort((a, b) => b.value - a.value)
   }, [holdings])
@@ -85,7 +98,8 @@ export function usePortfolioContext(
         const avgPrice = h.avgPrice.toFixed(2)
         const currentPrice = h.currentPrice.toFixed(2)
         const pnl = `${h.gainLossPercent >= 0 ? '+' : ''}${h.gainLossPercent.toFixed(0)}%`
-        return `- ${h.ticker} [${h.sector}, ${h.region}]: ${h.shares}x @ ${sym}${avgPrice} avg → ${sym}${currentPrice} now (${h.weight}%, ${pnl})`
+        const priceStatus = h.priceStatus ? `, price status: ${h.priceStatus}${h.priceNote ? ` (${h.priceNote})` : ''}` : ''
+        return `- ${h.ticker} [${h.sector}, ${h.region}]: ${h.shares}x @ ${sym}${avgPrice} avg → ${sym}${currentPrice} now (${h.weight}%, ${pnl}${priceStatus})`
       })
       .join('\n')
 
@@ -110,6 +124,7 @@ export function usePortfolioContext(
     const totalValue = summary.total_value || 0
     const totalGainLoss = summary.total_gain_loss || 0
     const totalReturn = summary.total_gain_loss_pct || 0
+    const dataNotesSection = buildDataNotesSection(exchangeRates)
 
     const profile = settings.profile
     const hasProfile = !!(profile?.age || profile?.horizon || profile?.goal)
@@ -150,6 +165,7 @@ ${regionSummary}
 
 ### Holdings (sorted by value):
 ${holdingsTable}
+${dataNotesSection ? `\n${dataNotesSection}` : ''}
 ${shouldIncludeTax ? `\n${taxFreeSection}` : ''}
 `.trim()
 
@@ -162,6 +178,7 @@ ${shouldIncludeTax ? `\n${taxFreeSection}` : ''}
       totalReturn,
       holdingsCount: holdings.length,
       portfolioData,
+      dataNotesSection,
       profile,
       hasProfile,
       profileSection,
@@ -176,7 +193,7 @@ ${shouldIncludeTax ? `\n${taxFreeSection}` : ''}
       promptOptions,
       baseContext,
     }
-  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData, transactions, selectedTicker, replacementTicker, promptOptions])
+  }, [portfolioData, summary, settings.profile, holdings.length, taxFreeData, transactions, exchangeRates, selectedTicker, replacementTicker, promptOptions])
 
   return { portfolioData, promptContext }
 }

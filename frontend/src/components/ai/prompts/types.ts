@@ -37,6 +37,7 @@ export interface PromptContext {
   totalReturn: number
   holdingsCount: number
   portfolioData: PortfolioHolding[]
+  dataNotesSection: string
 
   // Investor profile
   profile?: InvestorProfile
@@ -58,6 +59,13 @@ export interface PromptContext {
 
   // Pre-built base context string
   baseContext: string
+}
+
+export interface ExchangeRateContext {
+  eurUsd: number
+  usdEur: number
+  updatedAt: string | null
+  source: string
 }
 
 // Each prompt exports this structure

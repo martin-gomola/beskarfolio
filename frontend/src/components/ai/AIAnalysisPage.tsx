@@ -27,6 +27,8 @@ import {
 import { loadAISettings } from '../../utils/aiSettings'
 import { taxService } from '../../services/taxService'
 import { transactionService } from '../../services/transactionService'
+import { api } from '../../services/api'
+import { ExchangeRateContext } from './prompts/types'
 
 interface AIAnalysisPageProps {
   holdings: Holding[]
@@ -64,6 +66,7 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
   const [copyError, setCopyError] = useState<string | null>(null)
   const [taxFreeData, setTaxFreeData] = useState<TaxFreeHolding[] | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRateContext | null>(null)
   const [selectedTicker, setSelectedTicker] = useState('')
   const [promptOptions, setPromptOptions] = useState<PromptOptions>(DEFAULT_PROMPT_OPTIONS)
 
@@ -74,6 +77,33 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
       taxService.getTaxFreeHoldings().then(setTaxFreeData).catch(() => setTaxFreeData(null))
     }
   }, [holdings.length])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadExchangeRates = async () => {
+      try {
+        const response = await api.get('/api/exchange-rates')
+        const rates = response.data?.rates
+        if (!cancelled && typeof rates?.EUR_USD === 'number' && typeof rates?.USD_EUR === 'number') {
+          setExchangeRates({
+            eurUsd: rates.EUR_USD,
+            usdEur: rates.USD_EUR,
+            updatedAt: response.data?.updated_at ?? null,
+            source: response.data?.source ?? 'unknown',
+          })
+        }
+      } catch {
+        if (!cancelled) setExchangeRates(null)
+      }
+    }
+
+    void loadExchangeRates()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const loadTransactions = useCallback(async () => {
     try {
@@ -119,6 +149,7 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
     settings,
     taxFreeData,
     transactions,
+    exchangeRates,
     selectedTicker,
     '',
     promptOptions

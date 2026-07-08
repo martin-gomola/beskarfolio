@@ -47,4 +47,6 @@ export interface PortfolioHolding {
   currency: string
   sector: string
   region: string
+  priceStatus?: 'current' | 'stale' | 'estimated'
+  priceNote?: string | null
 }

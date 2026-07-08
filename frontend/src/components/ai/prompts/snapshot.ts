@@ -19,11 +19,13 @@ export const snapshotPrompt: PromptDefinition = {
     const rows = portfolioData.map((h) => {
       const sym = h.currency === 'USD' ? '$' : '€'
       const avgPrice = h.avgPrice.toFixed(2)
+      const currentPrice = h.currentPrice.toFixed(2)
       const valueEur = h.value.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
-      return `| ${h.ticker} | ${h.shares} | ${sym}${avgPrice} | ${h.currency} | €${valueEur} | ${h.weight}% |`
+      const priceStatus = h.priceStatus ?? 'unknown'
+      return `| ${h.ticker} | ${h.shares} | ${sym}${avgPrice} | ${sym}${currentPrice} | ${h.currency} | ${priceStatus} | €${valueEur} | ${h.weight}% |`
     })
 
     const totalValueFmt = totalValue.toLocaleString('en-US', {
@@ -38,9 +40,11 @@ export const snapshotPrompt: PromptDefinition = {
 **Total Value:** €${totalValueFmt}
 **Holdings:** ${holdingsCount}
 
-| Ticker | Shares | Avg Cost | Currency | Current Value (EUR) | % of Portfolio |
-|--------|--------|----------|----------|---------------------|----------------|
+| Ticker | Shares | Avg Cost | Current Price | Currency | Price Status | Current Value (EUR) | % of Portfolio |
+|--------|--------|----------|---------------|----------|--------------|---------------------|----------------|
 ${rows.join('\n')}
+
+${ctx.dataNotesSection}
 
 ${buildGuidanceSection(ctx)}`
   },
