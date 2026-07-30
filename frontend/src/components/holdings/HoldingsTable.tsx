@@ -11,6 +11,8 @@ import { FiftyTwoWeekChip } from './FiftyTwoWeekChip'
 interface HoldingsTableProps {
   holdings: Holding[]
   onUpdate: () => void
+  mobileExpanded?: boolean
+  onMobileExpandedChange?: (expanded: boolean) => void
 }
 
 type ColumnKey = 'shares' | 'avgPrice' | 'invested' | 'currentPrice' | 'value' | 'return'
@@ -38,7 +40,12 @@ const DEFAULT_COLUMNS: VisibleColumns = {
  * Displays all portfolio holdings with sortable columns and search
  * Includes mobile column visibility selector
  */
-export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate }) => {
+export const HoldingsTable: React.FC<HoldingsTableProps> = ({
+  holdings,
+  onUpdate,
+  mobileExpanded = false,
+  onMobileExpandedChange,
+}) => {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -175,7 +182,22 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
       <div className="glass rounded-xl overflow-hidden">
         <div className="px-4 sm:px-5 py-4 border-b border-white/5">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-lg font-semibold text-white tracking-tight font-heading">Holdings</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-white tracking-tight font-heading">Holdings details</h2>
+              <p className="mt-0.5 text-xs text-gray-500 md:hidden">
+                Prices, history and position actions
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onMobileExpandedChange?.(!mobileExpanded)}
+              aria-expanded={mobileExpanded}
+              aria-controls="mobile-holdings-list"
+              className="min-h-11 rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 text-sm font-medium text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 md:hidden"
+            >
+              {mobileExpanded ? 'Hide details' : `View all ${holdings.length}`}
+            </button>
             
             {/* Column Selector */}
             <div className="relative hidden md:block">
@@ -288,7 +310,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
           </div>
 
           {/* Search Bar */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`${mobileExpanded ? 'flex' : 'hidden'} items-center gap-2 sm:gap-3 md:flex`}>
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/>
@@ -316,83 +338,78 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({ holdings, onUpdate
           </div>
         </div>
 
-        <div className="md:hidden divide-y divide-white/5">
+        <div id="mobile-holdings-list" className={`${mobileExpanded ? 'divide-y divide-white/5' : 'hidden'} md:hidden`}>
           {filteredHoldings.map((holding) => {
             const returnColor = getReturnColor(holding)
-            const returnBg = getReturnBackground(holding)
             const isExpanded = expandedTicker === holding.ticker
 
             return (
               <div key={holding.ticker} className={`${isExpanded ? 'bg-white/[0.02]' : ''}`}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  className="w-full px-3 py-4 text-left transition-colors hover:bg-white/[0.02] focus:outline-none focus:ring-2 focus:ring-accent-500/40 btn-press"
-                  onClick={() => setExpandedTicker(isExpanded ? null : holding.ticker)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      setExpandedTicker(isExpanded ? null : holding.ticker)
-                    }
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <svg
-                          className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                        </svg>
-                        <span className="truncate text-base font-semibold text-gray-100">{holding.ticker}</span>
-                        <FiftyTwoWeekChip
-                          currentPrice={holding.current_price}
-                          range={weekRanges[holding.ticker]}
-                        />
+                <div className="flex items-start gap-1 px-2 py-2">
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 rounded-lg px-1 py-2 text-left transition-colors hover:bg-white/[0.02] focus:outline-none focus:ring-2 focus:ring-accent-500/40 btn-press"
+                    onClick={() => setExpandedTicker(isExpanded ? null : holding.ticker)}
+                    aria-expanded={isExpanded}
+                    aria-controls={`holding-details-${holding.ticker}`}
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <svg
+                            className={`h-4 w-4 shrink-0 text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            aria-hidden="true"
+                          >
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
+                          <span className="truncate text-base font-semibold text-gray-100">{holding.ticker}</span>
+                          <FiftyTwoWeekChip
+                            currentPrice={holding.current_price}
+                            range={weekRanges[holding.ticker]}
+                          />
+                        </div>
+                        <div className="mt-1 pl-6 text-xs text-gray-500">
+                          {isPrivate
+                            ? PRIVACY_MASK
+                          : `${holding.shares.toLocaleString('en-US', { maximumFractionDigits: 2 })} shares at ${formatCurrency(holding.avg_buy_price, holding.currency)}`}
+                        </div>
                       </div>
-                      <div className="mt-1 pl-6 text-xs text-gray-500">
-                        {isPrivate ? PRIVACY_MASK : `${holding.shares.toFixed(2)} shares`}
+
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-medium tabular-nums text-gray-100">{renderValueCell(holding)}</div>
+                        <div className={`mt-1 text-xs font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
+                          {renderReturnPercent(holding)}
+                        </div>
                       </div>
                     </div>
+                  </button>
 
-                    <div onClick={(event) => event.stopPropagation()}>
-                      <TickerActionsMenu
-                        ticker={holding.ticker}
-                        onViewTransactions={() => setSelectedTicker(holding.ticker)}
-                        onViewPriceHistory={() => setExpandedTicker(isExpanded ? null : holding.ticker)}
-                        onHoldingRemoved={onUpdate}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-2 gap-3 pl-6">
-                    <div>
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Price</div>
-                      <div className="mt-1 text-sm font-medium text-gray-300">{renderPriceCell(holding)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Value</div>
-                      <div className="mt-1 text-sm font-medium text-gray-100">{renderValueCell(holding)}</div>
-                    </div>
-                  </div>
-
-                  <div className={`mt-4 rounded-xl px-3 py-3 ${returnBg}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Return</div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${returnBg} ${returnColor}`}>
-                        {renderReturnPercent(holding)}
-                      </span>
-                    </div>
-                    <div className={`mt-1 max-w-full break-words text-right font-semibold leading-tight tracking-tight ${isPrivate ? 'text-gray-500' : returnColor} text-[clamp(1.05rem,5.2vw,1.35rem)]`}>
-                      {renderReturnValue(holding)}
-                    </div>
+                  <div className="shrink-0">
+                    <TickerActionsMenu
+                      ticker={holding.ticker}
+                      onViewTransactions={() => setSelectedTicker(holding.ticker)}
+                      onViewPriceHistory={() => setExpandedTicker(isExpanded ? null : holding.ticker)}
+                      onHoldingRemoved={onUpdate}
+                    />
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-white/5">
+                  <div id={`holding-details-${holding.ticker}`} className="border-t border-white/5">
+                    <div className="grid grid-cols-2 gap-3 px-4 py-3">
+                      <div>
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Current price</div>
+                        <div className="mt-1 text-sm font-medium text-gray-300">{renderPriceCell(holding)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[11px] font-medium uppercase tracking-wide text-gray-600">Profit & loss</div>
+                        <div className={`mt-1 text-sm font-semibold ${isPrivate ? 'text-gray-500' : returnColor}`}>
+                          {renderReturnValue(holding)}
+                        </div>
+                      </div>
+                    </div>
                     <PriceHistoryInline ticker={holding.ticker} currency={holding.currency} />
                   </div>
                 )}

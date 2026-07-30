@@ -2,7 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { Holding } from '../../types'
 import { usePrivacyMode, useTargetAllocations, useTickerProfiles } from '../../hooks'
-import { AllocationDonutView } from './AllocationDonutView'
+import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
+import { CHART_COLORS } from '../../utils/constants'
+import {
+  AllocationDonutView,
+  SelectedPositionDetails,
+  type AllocationChartItem,
+} from './AllocationDonutView'
 import { TargetAllocationView } from './TargetAllocationView'
 
 // Inline SVG icons
@@ -94,6 +100,7 @@ interface Alert {
 interface AssetAllocationChartProps {
   holdings: Holding[]
   totalValue: number
+  onViewAllHoldings?: () => void
 }
 
 /**
@@ -102,7 +109,11 @@ interface AssetAllocationChartProps {
  * 1. Allocation - Shows portfolio distribution
  * 2. Target Check - Compares current vs target allocation with drift
  */
-export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({ holdings, totalValue }) => {
+export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({
+  holdings,
+  totalValue,
+  onViewAllHoldings,
+}) => {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('allocation')
@@ -238,65 +249,78 @@ export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({ hold
 
   const hasTargets = targetAllocations && Object.keys(targetAllocations).length > 0
 
-  // Prepare data for pie chart using EUR values for consistency, sorted by value descending
-  const chartData = holdings
+  const chartData = React.useMemo<AllocationChartItem[]>(() => holdings
     .map(holding => ({
       name: holding.ticker,
       value: getHoldingValueEur(holding),
       percentage: safeTotalValue > 0 ? (getHoldingValueEur(holding) / safeTotalValue) * 100 : 0,
       currency: holding.currency,
-      // Include full holding data for details panel
       shares: holding.shares,
       avgPrice: holding.avg_buy_price,
       currentPrice: holding.current_price,
       gainLoss: holding.gain_loss,
       gainLossPct: holding.gain_loss_pct,
-      nativeValue: holding.current_value
+      nativeValue: holding.current_value,
     }))
     .filter(item => Number.isFinite(item.value) && item.value > 0)
-    .sort((a, b) => b.value - a.value)
+    .sort((a, b) => b.value - a.value), [getHoldingValueEur, holdings, safeTotalValue])
+
+  useEffect(() => {
+    if (selectedIndex !== null && selectedIndex >= chartData.length) {
+      setSelectedIndex(null)
+    }
+  }, [chartData.length, selectedIndex])
   
   return (
     <div className="glass rounded-xl p-4 sm:p-5">
       {/* Header with view toggle */}
       <div className="flex items-center justify-between mb-3 sm:mb-4">
-        <h3 className="text-base sm:text-lg font-semibold text-white tracking-tight font-heading">Asset Allocation</h3>
+        <div>
+          <h3 className="text-base sm:text-lg font-semibold text-white tracking-tight font-heading">Portfolio composition</h3>
+          <p className="mt-0.5 text-xs text-gray-500">Allocation and largest positions</p>
+        </div>
         
         {/* View Toggle - Refined segmented control */}
         <div className="flex bg-white/5 rounded-lg p-0.5">
           <button
             onClick={() => setViewMode('allocation')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+            aria-label="Show portfolio allocation"
+            aria-pressed={viewMode === 'allocation'}
+            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md text-xs font-medium transition-all ${
               viewMode === 'allocation'
                 ? 'bg-accent-600 text-white shadow-sm'
                 : 'text-gray-400 hover:text-white'
             }`}
             title="Portfolio allocation"
           >
-            <PieChartIcon size={12} />
+            <PieChartIcon size={16} />
           </button>
           <button
             onClick={() => setViewMode('sector')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+            aria-label="Show sector and region breakdown"
+            aria-pressed={viewMode === 'sector'}
+            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md text-xs font-medium transition-all ${
               viewMode === 'sector'
                 ? 'bg-accent-600 text-white shadow-sm'
                 : 'text-gray-400 hover:text-white'
             }`}
             title="Sector & Region breakdown"
           >
-            <LayersIcon size={12} />
+            <LayersIcon size={16} />
           </button>
           {hasTargets && (
             <button
               onClick={() => setViewMode('target')}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+              aria-label="Show target allocation check"
+              aria-pressed={viewMode === 'target'}
+              className={`flex min-h-11 min-w-11 items-center justify-center rounded-md text-xs font-medium transition-all ${
                 viewMode === 'target'
                   ? 'bg-accent-600 text-white shadow-sm'
                   : 'text-gray-400 hover:text-white'
               }`}
               title="Target allocation check"
             >
-              <TargetIcon size={12} />
+              <TargetIcon size={16} />
             </button>
           )}
         </div>
@@ -304,15 +328,100 @@ export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({ hold
 
       {/* Allocation View - Pie Chart */}
       {viewMode === 'allocation' && (
-        <AllocationDonutView
-          activeIndex={activeIndex}
-          selectedIndex={selectedIndex}
-          chartData={chartData}
-          safeTotalValue={safeTotalValue}
-          isPrivate={isPrivate}
-          onActiveIndexChange={setActiveIndex}
-          onSelectedIndexChange={setSelectedIndex}
-        />
+        <div className="grid gap-5 lg:grid-cols-[minmax(320px,0.8fr)_minmax(0,1.2fr)] lg:items-start lg:gap-8 xl:grid-cols-[380px_minmax(0,1fr)]">
+          <AllocationDonutView
+            activeIndex={activeIndex}
+            selectedIndex={selectedIndex}
+            chartData={chartData}
+            safeTotalValue={safeTotalValue}
+            isPrivate={isPrivate}
+            onActiveIndexChange={setActiveIndex}
+            onSelectedIndexChange={setSelectedIndex}
+          />
+
+          <div className="min-w-0">
+            <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_88px_120px_90px] gap-3 border-b border-white/[0.07] px-3 pb-2 text-[10px] font-medium uppercase tracking-wide text-gray-500 lg:grid">
+              <span>Position</span>
+              <span className="text-right">Weight</span>
+              <span className="text-right">Value</span>
+              <span className="text-right">Return</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1 lg:block lg:space-y-1" aria-label="Largest portfolio positions">
+              {chartData.map((item, index) => {
+                const isSelected = selectedIndex === index
+                const returnColor = item.gainLoss >= 0 ? 'text-gain' : 'text-loss'
+                return (
+                  <React.Fragment key={item.name}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIndex(isSelected ? null : index)}
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onMouseLeave={() => setActiveIndex(null)}
+                      aria-expanded={isSelected}
+                      className={`flex min-h-16 w-full items-center rounded-lg px-2.5 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500/50 lg:grid lg:min-h-14 lg:grid-cols-[minmax(0,1fr)_88px_120px_90px] lg:gap-3 lg:px-3 ${
+                        isSelected ? 'bg-accent-600/20' : 'hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0">
+                          <span className="flex items-baseline gap-2">
+                            <span className="truncate text-sm font-medium text-white">{item.name}</span>
+                            <span className="shrink-0 text-xs font-semibold tabular-nums text-gray-300 lg:hidden">
+                              {item.percentage.toFixed(1)}%
+                            </span>
+                          </span>
+                          <span className="block text-xs text-gray-500">
+                            {item.shares.toLocaleString('en-US', { maximumFractionDigits: 2 })} shares
+                          </span>
+                        </span>
+                      </span>
+
+                      <span className="hidden text-right text-sm font-medium tabular-nums text-gray-300 lg:block">
+                        {item.percentage.toFixed(1)}%
+                      </span>
+
+                      <span className="hidden text-right lg:block">
+                        <span className="block text-sm font-medium tabular-nums text-gray-100">
+                          {isPrivate ? PRIVACY_MASK : `€${item.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
+                        </span>
+                      </span>
+
+                      <span className={`hidden text-right text-sm font-semibold tabular-nums lg:block ${isPrivate ? 'text-gray-500' : returnColor}`}>
+                        {isPrivate ? PRIVACY_MASK : `${item.gainLossPct >= 0 ? '+' : ''}${item.gainLossPct.toFixed(1)}%`}
+                      </span>
+                    </button>
+
+                    {isSelected && (
+                      <div className="col-span-2 lg:col-span-1">
+                        <SelectedPositionDetails
+                          item={item}
+                          selectedIndex={index}
+                          isPrivate={isPrivate}
+                          onClose={() => setSelectedIndex(null)}
+                        />
+                      </div>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </div>
+
+            {onViewAllHoldings && (
+              <button
+                type="button"
+                onClick={onViewAllHoldings}
+                className="mt-3 min-h-11 w-full rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 text-sm font-medium text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 lg:hidden"
+              >
+                View all {holdings.length} holdings
+              </button>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Target Check View */}

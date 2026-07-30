@@ -20,7 +20,7 @@ import { DashboardSkeleton, BackupDropdown, BackendWakingOverlay } from './compo
 import { ToolsMenu } from './components/tools/ToolsMenu'
 
 // Dashboard Components (always loaded - main view)
-import { PortfolioSummary as PortfolioCard, TopPerformersStrip } from './components/portfolio'
+import { PortfolioSummary as PortfolioCard } from './components/portfolio'
 
 // Lazy load chart (recharts is 160KB - defer until visible)
 const AssetAllocationChart = lazy(() => import('./components/portfolio/AssetAllocationChart').then(m => ({ default: m.AssetAllocationChart })))
@@ -178,6 +178,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>(getTabFromHash)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
+  const [mobileHoldingsExpanded, setMobileHoldingsExpanded] = useState(false)
   
   // Scroll direction for hiding/showing bottom nav
   const scrollDirection = useScrollDirection(15)
@@ -208,22 +209,35 @@ const App: React.FC = () => {
 
   // Auto-refresh prices every 30 min (silent, no UI disruption)
   const autoRefreshRunning = useRef(false)
-  const handleAutoRefresh = useCallback(async () => {
-    if (autoRefreshRunning.current) return
+  const handleAutoRefresh = useCallback(async (): Promise<boolean> => {
+    if (autoRefreshRunning.current) return false
     autoRefreshRunning.current = true
     try {
       const raw = localStorage.getItem('beskarfolio_guest_transactions')
-      if (!raw) return
+      if (!raw) return false
       const txns = JSON.parse(raw)
       const tickers = [...new Set(txns.map((t: any) => t.ticker))] as string[]
-      if (tickers.length === 0) return
+      if (tickers.length === 0) return false
       await priceService.updatePrices(tickers)
       window.dispatchEvent(new Event('prices-updated'))
       handleDataUpdate()
-    } catch { /* silent */ } finally {
+      return true
+    } catch {
+      return false
+    } finally {
       autoRefreshRunning.current = false
     }
   }, [handleDataUpdate])
+
+  const handleViewAllHoldings = useCallback(() => {
+    setMobileHoldingsExpanded(true)
+    window.requestAnimationFrame(() => {
+      document.getElementById('holdings-detail')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+  }, [])
 
   useEffect(() => {
     const listener = () => { handleAutoRefresh() }
@@ -385,19 +399,26 @@ const App: React.FC = () => {
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fade-in">
-            <PortfolioCard summary={summary} />
-
-            {summary && summary.transaction_count > 0 && holdings.length > 0 && (
-              <TopPerformersStrip holdings={holdings} />
-            )}
+            <PortfolioCard summary={summary} onRefreshPrices={handleAutoRefresh} />
 
             {summary && summary.transaction_count > 0 && holdings.length > 0 && (
               <Suspense fallback={<div className="h-64 bg-surface-elevated rounded-lg animate-pulse" />}>
-                <AssetAllocationChart holdings={holdings} totalValue={summary.total_value} />
+                <AssetAllocationChart
+                  holdings={holdings}
+                  totalValue={summary.total_value}
+                  onViewAllHoldings={handleViewAllHoldings}
+                />
               </Suspense>
             )}
 
-            <HoldingsTable holdings={holdings} onUpdate={handleDataUpdate} />
+            <div id="holdings-detail" className="scroll-mt-20">
+              <HoldingsTable
+                holdings={holdings}
+                onUpdate={handleDataUpdate}
+                mobileExpanded={mobileHoldingsExpanded}
+                onMobileExpandedChange={setMobileHoldingsExpanded}
+              />
+            </div>
 
             {summary && summary.transaction_count > 0 && (
               <Suspense fallback={<div className="h-32 bg-surface-elevated rounded-lg animate-pulse" />}>

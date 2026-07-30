@@ -35,10 +35,6 @@ export function AllocationDonutView({
   onActiveIndexChange,
   onSelectedIndexChange,
 }: AllocationDonutViewProps) {
-  const handleLegendClick = (index: number) => {
-    onSelectedIndexChange(selectedIndex === index ? null : index)
-  }
-
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload
@@ -58,21 +54,22 @@ export function AllocationDonutView({
   }
 
   return (
-    <>
+    <div className="min-w-0">
       <div className="flex flex-col items-center">
-        <div className="relative flex-shrink-0" style={{ height: '260px', width: '260px' }}>
+        <div className="relative h-[250px] w-[250px] flex-shrink-0 sm:h-[280px] sm:w-[280px] lg:h-[300px] lg:w-[300px] xl:h-[320px] xl:w-[320px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={70}
-                outerRadius={120}
+                innerRadius="55%"
+                outerRadius="92%"
                 paddingAngle={1}
                 dataKey="value"
                 onMouseEnter={(_, index) => onActiveIndexChange(index)}
                 onMouseLeave={() => onActiveIndexChange(null)}
+                onClick={(_, index) => onSelectedIndexChange(selectedIndex === index ? null : index)}
                 animationBegin={0}
                 animationDuration={800}
               >
@@ -102,53 +99,12 @@ export function AllocationDonutView({
             </div>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 lg:flex lg:flex-wrap lg:justify-center gap-x-4 gap-y-1.5 mt-3">
-          {chartData.map((item, index) => (
-            <div
-              key={item.name}
-              className={`flex items-center gap-1.5 px-1.5 py-1 rounded transition-all cursor-pointer min-w-0 ${
-                selectedIndex === index
-                  ? 'bg-accent-600/30 ring-1 ring-accent-500/50'
-                  : activeIndex === index
-                    ? 'bg-gray-700/80'
-                    : 'hover:bg-gray-800/50'
-              }`}
-              onMouseEnter={() => onActiveIndexChange(index)}
-              onMouseLeave={() => onActiveIndexChange(null)}
-              onClick={() => handleLegendClick(index)}
-            >
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-              />
-              <span className="text-white text-xs font-medium truncate">{item.name}</span>
-              <span className="text-white text-xs font-semibold flex-shrink-0">
-                {item.percentage.toFixed(1)}%
-              </span>
-              {!isPrivate && (
-                <span className="text-[10px] text-gray-500 flex-shrink-0 hidden xs:inline">
-                  €{(item.value / 1000).toFixed(1)}k
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
       </div>
-
-      {selectedIndex !== null && chartData[selectedIndex] && (
-        <SelectedPositionDetails
-          item={chartData[selectedIndex]}
-          selectedIndex={selectedIndex}
-          isPrivate={isPrivate}
-          onClose={() => onSelectedIndexChange(null)}
-        />
-      )}
-    </>
+    </div>
   )
 }
 
-function SelectedPositionDetails({
+export function SelectedPositionDetails({
   item,
   selectedIndex,
   isPrivate,
@@ -163,43 +119,41 @@ function SelectedPositionDetails({
   const isPositive = item.gainLoss >= 0
 
   return (
-    <div className="mt-3 pt-3 sm:pt-4 border-t border-gray-700/50">
-      <div className="hidden lg:flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-3 h-3 rounded-full flex-shrink-0"
-            style={{ backgroundColor: CHART_COLORS[selectedIndex % CHART_COLORS.length] }}
-          />
-          <span className="text-white font-bold">{item.name}</span>
-        </div>
-
-        <div className="text-center">
-          <div className="text-gray-500 text-[10px] uppercase">Value</div>
-          <div className="text-white font-semibold">
-            {isPrivate ? PRIVACY_MASK : (
-              <>
-                {currencySymbol}{item.nativeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                {item.currency === 'USD' && (
-                  <span className="text-gray-500 text-xs ml-1">(€{(item.value / 1000).toFixed(1)}k)</span>
-                )}
-              </>
-            )}
+    <div className="mt-2">
+      <div className="hidden grid-cols-[minmax(120px,1.2fr)_minmax(105px,1fr)_60px_90px_minmax(110px,1fr)_44px] items-center gap-2 rounded-lg border border-white/[0.07] bg-white/[0.025] px-4 py-3 lg:grid xl:gap-4">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <div
+              className="h-3 w-3 flex-shrink-0 rounded-full"
+              style={{ backgroundColor: CHART_COLORS[selectedIndex % CHART_COLORS.length] }}
+            />
+            <span className="truncate font-bold text-white">{item.name}</span>
+          </div>
+          <div className="mt-1 truncate text-base font-semibold tabular-nums text-white">
+            {isPrivate ? PRIVACY_MASK : `${currencySymbol}${item.nativeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </div>
         </div>
 
-        <div className="text-center">
-          <div className="text-gray-500 text-[10px] uppercase">Shares</div>
-          <div className="text-gray-200 font-medium">{isPrivate ? PRIVACY_MASK : item.shares.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Profit & loss</div>
+          <div className={`truncate font-bold tabular-nums ${isPrivate ? 'text-gray-500' : isPositive ? 'text-gain' : 'text-loss'}`}>
+            {isPrivate ? PRIVACY_MASK : `${isPositive ? '+' : ''}${currencySymbol}${Math.abs(item.gainLoss).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </div>
         </div>
 
-        <div className="text-center">
-          <div className="text-gray-500 text-[10px] uppercase">Avg</div>
-          <div className="text-gray-200 font-medium">{isPrivate ? PRIVACY_MASK : `${currencySymbol}${item.avgPrice.toFixed(2)}`}</div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Shares</div>
+          <div className="font-medium tabular-nums text-gray-200">{isPrivate ? PRIVACY_MASK : item.shares.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
         </div>
 
-        <div className="text-center">
-          <div className="text-gray-500 text-[10px] uppercase">Now</div>
-          <div className="text-gray-200 font-medium">
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Avg price</div>
+          <div className="font-medium tabular-nums text-gray-200">{isPrivate ? PRIVACY_MASK : `${currencySymbol}${item.avgPrice.toFixed(2)}`}</div>
+        </div>
+
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Current</div>
+          <div className="whitespace-nowrap font-medium tabular-nums text-gray-200">
             {currencySymbol}{item.currentPrice.toFixed(2)}
             <span className={`ml-1 text-xs ${isPositive ? 'text-gain' : 'text-loss'}`}>
               ({isPositive ? '+' : ''}{item.gainLossPct.toFixed(0)}%)
@@ -207,69 +161,64 @@ function SelectedPositionDetails({
           </div>
         </div>
 
-        <div className="text-center">
-          <div className="text-gray-500 text-[10px] uppercase">P&L</div>
-          <div className={`font-bold ${isPrivate ? 'text-gray-500' : isPositive ? 'text-gain' : 'text-loss'}`}>
-            {isPrivate ? PRIVACY_MASK : `${isPositive ? '+' : ''}${currencySymbol}${Math.abs(item.gainLoss).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          </div>
-        </div>
-
         <button
+          type="button"
           onClick={onClose}
-          className="text-gray-500 hover:text-white p-1"
-          aria-label="Close"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/5 hover:text-white"
+          aria-label="Close position details"
         >
-          x
+          ×
         </button>
       </div>
 
-      <div className="lg:hidden">
-        <div className="flex items-center justify-between mb-2 sm:mb-3">
-          <div className="flex items-center gap-2">
+      <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3 sm:p-4 lg:hidden">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
             <div
-              className="w-3 h-3 rounded-full"
+              className="h-3 w-3 flex-shrink-0 rounded-full"
               style={{ backgroundColor: CHART_COLORS[selectedIndex % CHART_COLORS.length] }}
             />
-            <span className="text-white font-bold text-lg">{item.name}</span>
+            <span className="truncate text-lg font-bold text-white">{item.name}</span>
             {!isPrivate && item.currency === 'USD' && (
-              <span className="text-gray-500 text-sm">
-                (€{item.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})
+              <span className="truncate text-xs text-gray-500">
+                €{item.value.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </span>
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="text-gray-500 hover:text-white p-1 -mr-1"
-            aria-label="Close"
+            className="-mr-1 flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-white/5 hover:text-white"
+            aria-label="Close position details"
           >
-            x
+            ×
           </button>
         </div>
 
-        <div className="mb-2 sm:mb-3 flex items-baseline justify-between gap-2">
-          <span className="text-white font-semibold text-xl sm:text-2xl">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <span className="text-xl font-semibold text-white sm:text-2xl">
             {isPrivate ? PRIVACY_MASK : `${currencySymbol}${item.nativeValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </span>
-          <div className="text-right flex-shrink-0">
-            <span className="text-gray-500 text-xs">P&L: </span>
-            <span className={`font-bold text-base sm:text-lg ${isPrivate ? 'text-gray-500' : isPositive ? 'text-gain' : 'text-loss'}`}>
+          <div className="flex-shrink-0 text-right">
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Profit & loss</div>
+            <div className={`font-bold ${isPrivate ? 'text-gray-500' : isPositive ? 'text-gain' : 'text-loss'}`}>
               {isPrivate ? PRIVACY_MASK : `${isPositive ? '+' : ''}${currencySymbol}${Math.abs(item.gainLoss).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            </span>
+            </div>
           </div>
         </div>
 
-        <div className="pt-2 sm:pt-3 border-t border-gray-700/50 grid grid-cols-3 gap-1 sm:gap-2 text-center">
+        <div className="grid grid-cols-3 gap-2 border-t border-gray-700/50 pt-3 text-center">
           <div>
-            <div className="text-gray-500 text-[10px] uppercase">Shares</div>
-            <div className="text-gray-200 font-medium">{isPrivate ? PRIVACY_MASK : item.shares.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Shares</div>
+            <div className="font-medium text-gray-200">{isPrivate ? PRIVACY_MASK : item.shares.toLocaleString('en-US', { maximumFractionDigits: 2 })}</div>
           </div>
           <div>
-            <div className="text-gray-500 text-[10px] uppercase">Avg</div>
-            <div className="text-gray-200 font-medium">{isPrivate ? PRIVACY_MASK : `${currencySymbol}${item.avgPrice.toFixed(2)}`}</div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Avg price</div>
+            <div className="font-medium text-gray-200">{isPrivate ? PRIVACY_MASK : `${currencySymbol}${item.avgPrice.toFixed(2)}`}</div>
           </div>
           <div>
-            <div className="text-gray-500 text-[10px] uppercase">Now</div>
-            <div className="text-gray-200 font-medium">
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Current</div>
+            <div className="font-medium text-gray-200">
               {currencySymbol}{item.currentPrice.toFixed(2)}
               <span className={`ml-1 text-xs ${isPositive ? 'text-gain' : 'text-loss'}`}>
                 ({isPositive ? '+' : ''}{item.gainLossPct.toFixed(0)}%)

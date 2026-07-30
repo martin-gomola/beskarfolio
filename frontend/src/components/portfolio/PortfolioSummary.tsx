@@ -16,13 +16,14 @@ const formatNumber = (value: number): string => {
 
 interface PortfolioSummaryProps {
   summary: PortfolioSummaryType | null
+  onRefreshPrices?: () => Promise<boolean>
 }
 
 /**
  * Portfolio Overview Card
  * Displays total value, invested amount, returns, and key metrics
  */
-export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) => {
+export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary, onRefreshPrices }) => {
   const { priceStatus } = usePriceStatus()
   const { isPrivate } = usePrivacyMode()
   const { performanceData, loading: perfLoading } = useAnnualPerformance()
@@ -32,6 +33,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
 
   const returnColor = summary.total_gain_loss_pct >= 0 ? 'text-gain' : 'text-loss'
   const [isInfoOpen, setIsInfoOpen] = useState(false)
+  const [priceRefreshState, setPriceRefreshState] = useState<'idle' | 'loading' | 'error'>('idle')
   const infoRef = useRef<HTMLDivElement | null>(null)
 
   // YTD is the current-year row when the backend flags it.
@@ -105,6 +107,14 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
   }
 
   const priceInfo = getPriceInfo()
+  const pricesNeedAttention = priceInfo.color === 'text-yellow-400' || priceInfo.color === 'text-red-400'
+
+  const refreshPrices = async () => {
+    if (!onRefreshPrices || priceRefreshState === 'loading') return
+    setPriceRefreshState('loading')
+    const succeeded = await onRefreshPrices()
+    setPriceRefreshState(succeeded ? 'idle' : 'error')
+  }
   
   const getPriceIndicator = () => {
     if (!priceStatus || !priceStatus.has_prices) return { dotClass: 'bg-gray-500', label: 'No data' }
@@ -154,7 +164,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
           <p className="text-sm text-gray-500 mt-0.5">
             {summary.holdings_count} holdings · {summary.transaction_count} transactions
             {priceStatus && priceStatus.has_prices && (
-              <span className="mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex">
+              <span className={`${pricesNeedAttention ? 'hidden' : 'mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex'}`}>
                 <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>
                 Prices:
                 <span className={`inline-block w-2 h-2 rounded-full ${priceIndicator.dotClass}`} aria-hidden="true" />
@@ -164,7 +174,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
           </p>
           {!!summary.estimated_holdings_count && (
             <p className="text-xs text-amber-400 mt-1">
-              {summary.estimated_holdings_count} holding{summary.estimated_holdings_count === 1 ? '' : 's'} currently use cost basis because no quote was available.
+              {summary.estimated_holdings_count} holding{summary.estimated_holdings_count === 1 ? '' : 's'} currently {summary.estimated_holdings_count === 1 ? 'uses' : 'use'} cost basis because no quote was available.
             </p>
           )}
         </div>
@@ -199,8 +209,86 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary }) =
         </div>
       </div>
 
+      {pricesNeedAttention && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-amber-200">
+              Last price update: {priceIndicator.label}
+            </div>
+            <div className="text-xs text-amber-200/60">
+              Refresh before relying on today&apos;s portfolio value.
+            </div>
+            {priceRefreshState === 'error' && (
+              <div role="alert" className="mt-1 text-xs text-loss">
+                Prices could not be refreshed. Try again later.
+              </div>
+            )}
+          </div>
+          {onRefreshPrices && (
+            <button
+              type="button"
+              onClick={refreshPrices}
+              disabled={priceRefreshState === 'loading'}
+              className="min-h-11 shrink-0 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-300/15 focus:outline-none focus:ring-2 focus:ring-amber-300/50 disabled:cursor-wait disabled:opacity-60"
+            >
+              {priceRefreshState === 'loading' ? 'Updating…' : 'Update'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Mobile: one clear answer first, secondary performance beneath it. */}
+      <div className="glass rounded-xl p-4 sm:hidden">
+        <div className="text-xs font-medium uppercase tracking-wider text-gray-500">Portfolio value</div>
+        <div className="mt-1 text-3xl font-semibold tracking-tight text-white">
+          {isPrivate ? PRIVACY_MASK : `€${formatNumber(summary.total_value)}`}
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Total return</div>
+            <div className={`mt-1 text-xl font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
+              {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss_pct >= 0 ? '+' : ''}${summary.total_gain_loss_pct.toFixed(2)}%`}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Profit & loss</div>
+            <div className={`mt-1 text-xl font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
+              {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between border-t border-white/5 pt-3 text-sm">
+          <span className="text-gray-500">
+            Invested {isPrivate ? PRIVACY_MASK : `€${formatNumber(summary.total_invested)}`}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:hidden">
+        <div className="rounded-xl border border-white/5 bg-white/[0.025] px-3 py-3">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">YTD</div>
+          <div className={`mt-1 text-lg font-semibold tabular-nums ${
+            isPrivate || ytdPct === null ? 'text-gray-500' : ytdPct >= 0 ? 'text-gain' : 'text-loss'
+          }`}>
+            {perfLoading ? 'Loading…' : isPrivate ? PRIVACY_MASK : ytdPct === null ? 'Not available' : `${ytdPct >= 0 ? '+' : ''}${ytdPct.toFixed(2)}%`}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/5 bg-white/[0.025] px-3 py-3">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+            Avg annual{completedYearCount > 0 ? ` (${completedYearCount}y)` : ''}
+          </div>
+          <div className={`mt-1 text-lg font-semibold tabular-nums ${
+            isPrivate || avgAnnualPct === null ? 'text-gray-500' : avgAnnualPct >= 0 ? 'text-gain' : 'text-loss'
+          }`}>
+            {perfLoading ? 'Loading…' : isPrivate ? PRIVACY_MASK : avgAnnualPct === null ? 'Not available' : `${avgAnnualPct >= 0 ? '+' : ''}${avgAnnualPct.toFixed(2)}%`}
+          </div>
+        </div>
+      </div>
+
       {/* Metrics Grid — left column (amounts) wider, right column (%) narrower */}
-      <div className="grid grid-cols-[3fr_2fr] gap-3">
+      <div className="hidden grid-cols-[3fr_2fr] gap-3 sm:grid">
         {/* Row 1: Value | Return */}
         <div className="glass rounded-xl p-4">
           <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider mb-2">
