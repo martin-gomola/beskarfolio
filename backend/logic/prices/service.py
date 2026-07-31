@@ -3,10 +3,9 @@ Public price service facade over storage, provider orchestration, and history he
 """
 from __future__ import annotations
 
-from datetime import date, datetime, time, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
 import yfinance as yf
 
 from logic.prices.orchestrator import PriceOrchestrator
@@ -14,57 +13,10 @@ from logic.prices.shared import (
     get_cache_threshold_hours,
     get_effective_currency_for_ticker,
     get_file_fetch_metadata,
-    get_market_state,
     logger,
     normalize_ticker,
 )
 from logic.prices.storage import CSVStorageManager, get_historical_file_status, list_historical_tickers
-
-
-def finalize_daily_close(ticker: str) -> Optional[Tuple[date, float]]:
-    """Fetch the latest completed daily close via yfinance and persist it.
-
-    Writes to both the CSV history *and* the latest-price snapshot so
-    every consumer sees the newest close without a separate sync step.
-
-    Returns (close_date, close_price) on success, None on failure.
-    """
-    ticker = normalize_ticker(ticker)
-    market_state = get_market_state(ticker)
-
-    try:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="10d", interval="1d", auto_adjust=False)
-    except Exception as exc:
-        logger.warning(f"finalize_daily_close: yfinance fetch failed for {ticker}: {exc}")
-        return None
-
-    hist = hist.dropna(subset=["Close"])
-    if hist.empty:
-        return None
-
-    rows = [(pd.Timestamp(idx).date(), float(row["Close"])) for idx, row in hist.iterrows()]
-    if not rows:
-        return None
-
-    market_date = market_state["market_date"]
-    if rows[-1][0] >= market_date and not market_state["is_after_close"] and len(rows) > 1:
-        close_date, close_price = rows[-2]
-    else:
-        close_date, close_price = rows[-1]
-
-    CSVStorageManager.save_price_to_csv(
-        ticker, close_price, datetime.combine(close_date, time(0, 0), tzinfo=timezone.utc)
-    )
-    CSVStorageManager.save_latest_snapshot(
-        ticker,
-        close_price,
-        updated_at=datetime.now(timezone.utc),
-        source="daily_close",
-        market_date=close_date.isoformat(),
-    )
-    logger.info(f"finalize_daily_close: {ticker} -> ${close_price:.2f} ({close_date.isoformat()})")
-    return close_date, close_price
 
 
 def _parse_snapshot_result(snapshot: Dict[str, object]) -> Dict[str, Any]:

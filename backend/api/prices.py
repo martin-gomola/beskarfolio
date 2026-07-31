@@ -11,6 +11,7 @@ import logging
 import json
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+import requests as http_requests
 from fastapi import APIRouter, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -18,8 +19,6 @@ from slowapi.util import get_remote_address
 from api.error_handling import raise_unexpected_error
 from config import settings
 
-# Rate limiter for this module
-limiter = Limiter(key_func=get_remote_address)
 from logic.models import (
     HistoricalPriceStatusResponse,
     LatestPriceItem,
@@ -32,19 +31,19 @@ from logic.prices.read_model import (
     get_price_range,
     get_price_status,
 )
-from logic.prices.shared import get_market_date_for_ticker
-from logic.prices.orchestrator import PriceOrchestrator
+from logic.prices.refresh import PriceRefreshMode, refresh_prices
 from logic.prices.service import (
-    finalize_daily_close,
     get_all_prices,
     get_historical_file_status_for_ticker,
-    get_latest_price,
     update_all_prices,
 )
-from logic.prices.storage import CSVStorageManager, PricePersistenceError, list_historical_tickers
+from logic.prices.storage import PricePersistenceError, list_historical_tickers
 # Currency rates are returned by get_exchange_rates endpoint
 
 logger = logging.getLogger(__name__)
+
+# Rate limiter for this module
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -221,120 +220,20 @@ async def update_prices(request: Request, price_request: PriceUpdateRequest = No
             force_refresh = price_request.force or force
 
         if tickers:
-            tickers = sorted({(t or "").strip().upper() for t in tickers if (t or "").strip()})
+            try:
+                report = refresh_prices(
+                    tickers,
+                    mode=PriceRefreshMode.MANUAL,
+                    force_refresh=force_refresh,
+                )
+            except PricePersistenceError as exc:
+                logger.error(f"Price refresh persistence failed: {exc}")
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Fetched price data but could not persist it to disk: {exc}",
+                ) from exc
 
-            # Detailed results for each ticker
-            ticker_results = []
-            tickers_to_fetch = []
-            cached_count = 0
-
-            if not force_refresh:
-                cache_threshold = settings.PRICE_CACHE_HOURS
-                for ticker in tickers:
-                    latest = get_latest_price(ticker)
-                    fetch_age_hours = latest.get('fetch_age_hours', latest['age_hours']) if latest else None
-                    if not latest or fetch_age_hours is None or fetch_age_hours >= cache_threshold:
-                        tickers_to_fetch.append(ticker)
-                    else:
-                        cached_count += 1
-                        ticker_results.append({
-                            "ticker": ticker,
-                            "status": "cached",
-                            "price": latest['price'],
-                            "age_hours": round(fetch_age_hours, 1),
-                            "source": "cache"
-                        })
-            else:
-                tickers_to_fetch = tickers
-
-            # Fetch prices that need updating
-            updated_count = 0
-            failed_tickers = []
-
-            if tickers_to_fetch:
-                result = PriceOrchestrator.fetch_current_prices_batch_with_fallback(tickers_to_fetch)
-                
-                for ticker in tickers_to_fetch:
-                    price = result.get(ticker)
-                    if price:
-                        try:
-                            CSVStorageManager.save_latest_snapshot(
-                                ticker, price, source="api",
-                                market_date=get_market_date_for_ticker(ticker),
-                            )
-                        except PricePersistenceError as exc:
-                            # Server-side filesystem misconfiguration (most often a
-                            # container user that cannot write the bind-mounted data
-                            # volume). Bail loudly so the UI doesn't claim success
-                            # while the snapshot stays stuck at yesterday's value.
-                            logger.error(
-                                f"Persistence failed during /api/prices/update for {ticker}: {exc}"
-                            )
-                            raise HTTPException(
-                                status_code=503,
-                                detail=(
-                                    "Fetched fresh prices from API but could not persist them "
-                                    f"to disk: {exc}"
-                                ),
-                            ) from exc
-                        updated_count += 1
-                        ticker_results.append({
-                            "ticker": ticker,
-                            "status": "updated",
-                            "price": price,
-                            "source": "api_snapshot"
-                        })
-                    else:
-                        # Check if we have stale cache
-                        latest = get_latest_price(ticker)
-                        if latest:
-                            failed_tickers.append(ticker)
-                            ticker_results.append({
-                                "ticker": ticker,
-                                "status": "stale",
-                                "price": latest['price'],
-                                "age_hours": round(latest.get('fetch_age_hours', latest['age_hours']), 1),
-                                "error": "API failed, using stale cache"
-                            })
-                        else:
-                            failed_tickers.append(ticker)
-                            ticker_results.append({
-                                "ticker": ticker,
-                                "status": "failed",
-                                "error": "No price available"
-                            })
-
-            # Finalize daily closes into CSV for all requested tickers so the
-            # historical series stays current even when the cron job misses a run.
-            # finalize_daily_close writes both CSV and snapshot atomically.
-            close_count = 0
-            for ticker in tickers:
-                try:
-                    if finalize_daily_close(ticker):
-                        close_count += 1
-                except PricePersistenceError as exc:
-                    logger.error(
-                        f"Persistence failed during finalize_daily_close for {ticker}: {exc}"
-                    )
-                    raise HTTPException(
-                        status_code=503,
-                        detail=f"Could not persist daily close to disk: {exc}",
-                    ) from exc
-                except Exception as exc:
-                    # yfinance flakiness, network blips, etc. — non-fatal.
-                    logger.debug(f"finalize_daily_close failed for {ticker}: {exc}")
-
-            return {
-                "success": True,
-                "total_tickers": len(tickers),
-                "updated_count": updated_count,
-                "cached_count": cached_count,
-                "failed_count": len(failed_tickers),
-                "failed_tickers": failed_tickers if failed_tickers else None,
-                "ticker_results": ticker_results,
-                "closes_finalized": close_count,
-                "message": f"Updated {updated_count}/{len(tickers)} ticker(s), {cached_count} cached, {close_count} daily closes finalized"
-            }
+            return report.to_http_response()
 
         return update_all_prices(force_refresh=force_refresh)
 
@@ -383,8 +282,6 @@ async def get_exchange_rates():
 # ============================================================================
 # TICKER PROFILE ENDPOINTS (Sector, Industry, Country, ETF detection)
 # ============================================================================
-
-import requests as http_requests
 
 # ETF patterns for detection (suffix-based)
 ETF_PATTERNS = ['.DE', 'VWCE', 'SXR', 'IWDA', 'EUNL', 'CSPX', 'VOO', 'VTI', 'QQQ', 'SPY', 'IVV', 'VUG', 'VTV', 'VGT']
@@ -511,7 +408,7 @@ async def get_ticker_profile(request: Request, ticker: str):
     if finnhub_key:
         try:
             # Finnhub stock profile endpoint
-            url = f"https://finnhub.io/api/v1/stock/profile2"
+            url = "https://finnhub.io/api/v1/stock/profile2"
             params = {"symbol": ticker, "token": finnhub_key}
             
             resp = http_requests.get(url, params=params, timeout=10)
@@ -604,7 +501,7 @@ async def get_ticker_profiles_batch(request: Request, tickers: List[str]):
         
         try:
             if finnhub_key:
-                url = f"https://finnhub.io/api/v1/stock/profile2"
+                url = "https://finnhub.io/api/v1/stock/profile2"
                 params = {"symbol": ticker, "token": finnhub_key}
                 
                 resp = http_requests.get(url, params=params, timeout=10)

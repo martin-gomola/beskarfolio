@@ -6,6 +6,8 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from config import settings
+from logic.prices.refresh import PriceRefreshMode
+from logic.prices.storage import PricePersistenceError
 from main import app
 
 
@@ -80,6 +82,66 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(payload["prices_count"], 3)
         self.assertEqual(len(payload["prices"]), 3)
         self.assertIn("price_date", payload["prices"][0])
+
+    def test_price_update_delegates_to_shared_refresh_module(self) -> None:
+        expected = {
+            "success": True,
+            "total_tickers": 1,
+            "updated_count": 1,
+            "cached_count": 0,
+            "failed_count": 0,
+            "failed_tickers": None,
+            "ticker_results": [
+                {
+                    "ticker": "AAPL",
+                    "status": "updated",
+                    "price": 110.0,
+                    "source": "api_snapshot",
+                }
+            ],
+            "closes_finalized": 1,
+            "message": "Updated 1/1 ticker(s), 0 cached, 1 daily closes finalized",
+        }
+
+        with patch("api.prices.refresh_prices") as refresh_prices:
+            refresh_prices.return_value.to_http_response.return_value = expected
+            response = self.client.post(
+                "/api/prices/update",
+                json={"tickers": ["aapl"], "force": True},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), expected)
+        refresh_prices.assert_called_once_with(
+            ["aapl"],
+            mode=PriceRefreshMode.MANUAL,
+            force_refresh=True,
+        )
+
+    def test_price_update_surfaces_refresh_persistence_failure(self) -> None:
+        with patch(
+            "api.prices.refresh_prices",
+            side_effect=PricePersistenceError("disk full"),
+        ):
+            response = self.client.post(
+                "/api/prices/update",
+                json={"tickers": ["AAPL"], "force": True},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("could not persist", response.json()["detail"])
+
+    def test_price_update_surfaces_unexpected_refresh_failure(self) -> None:
+        with patch(
+            "api.prices.refresh_prices",
+            side_effect=RuntimeError("refresh defect"),
+        ):
+            response = self.client.post(
+                "/api/prices/update",
+                json={"tickers": ["AAPL"], "force": True},
+            )
+
+        self.assertEqual(response.status_code, 500)
 
     def test_allocation_status_preserves_typed_contract(self) -> None:
         request_payload = {

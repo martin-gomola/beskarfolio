@@ -226,6 +226,68 @@ class CSVStorageManager:
         )
 
     @staticmethod
+    def save_latest_snapshot_if_not_newer(
+        ticker: str,
+        price: float,
+        *,
+        updated_at: Optional[datetime] = None,
+        source: str = "snapshot",
+        market_date: str,
+        replace_same_market_date: bool = False,
+    ) -> bool:
+        """Atomically avoid replacing a snapshot from a newer market date."""
+        normalized_ticker = normalize_ticker(ticker)
+        snapshot_file = CSVStorageManager.get_snapshot_path()
+        updated_at_str = (updated_at or datetime.now(timezone.utc)).isoformat()
+
+        try:
+            with CSVStorageManager._file_lock(snapshot_file):
+                existing = CSVStorageManager.load_latest_snapshots()
+                current = existing.get(normalized_ticker)
+                current_market_date = None
+                if current:
+                    raw_current_market_date = str(current.get("market_date", ""))[:10]
+                    try:
+                        current_market_date = datetime.fromisoformat(
+                            raw_current_market_date
+                        ).date()
+                    except ValueError:
+                        pass
+                target_market_date = datetime.fromisoformat(market_date[:10]).date()
+
+                if current_market_date is not None and current_market_date > target_market_date:
+                    return False
+                if (
+                    current_market_date == target_market_date
+                    and not replace_same_market_date
+                ):
+                    return False
+
+                existing[normalized_ticker] = {
+                    "price": float(price),
+                    "updated_at": updated_at_str,
+                    "market_date": market_date,
+                    "source": source,
+                }
+                now_utc = datetime.now(timezone.utc).isoformat()
+                payload = {
+                    "updated_at": now_utc,
+                    "prices": {
+                        existing_ticker: existing[existing_ticker]
+                        for existing_ticker in sorted(existing.keys())
+                    },
+                }
+                CSVStorageManager._atomic_write_json(snapshot_file, payload)
+                return True
+        except OSError as exc:
+            logger.error(f"Error saving latest price snapshot to {snapshot_file}: {exc}")
+            raise PricePersistenceError(
+                f"Could not write {snapshot_file}: {exc}. "
+                "Check that the container user can write to the data volume "
+                "(see PUID/PGID in docker-compose.yml)."
+            ) from exc
+
+    @staticmethod
     def load_cached_series(ticker: str) -> Optional[HistoricalSeriesCacheEntry]:
         csv_file = CSVStorageManager.get_csv_path(ticker)
         if not os.path.exists(csv_file):

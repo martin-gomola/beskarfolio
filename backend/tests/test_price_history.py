@@ -191,6 +191,26 @@ class PriceHistoryTests(unittest.TestCase):
             with self.assertRaises(PricePersistenceError):
                 CSVStorageManager.save_latest_snapshot("AAPL", 101.25)
 
+    def test_conditional_close_write_preserves_interleaved_newer_snapshot(self) -> None:
+        CSVStorageManager.save_latest_snapshot(
+            "AAPL",
+            110.0,
+            source="api",
+            market_date="2026-07-31",
+        )
+
+        promoted = CSVStorageManager.save_latest_snapshot_if_not_newer(
+            "AAPL",
+            100.0,
+            source="daily_close",
+            market_date="2026-07-30",
+        )
+
+        latest = CSVStorageManager.load_latest_snapshot("AAPL")
+        self.assertFalse(promoted)
+        self.assertEqual(latest["price"], 110.0)
+        self.assertEqual(latest["market_date"], "2026-07-31")
+
     def test_historical_dataframe_write_failure_raises_persistence_error(self) -> None:
         df = pd.DataFrame({"Date": ["2024-01-05"], "Close": [101.25]})
 
