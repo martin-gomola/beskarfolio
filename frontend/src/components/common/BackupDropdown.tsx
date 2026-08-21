@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { loadGuestTransactions } from '../../utils/guestStorage'
+import {
+  readBrowserTransactions,
+  subscribeBrowserPortfolioState,
+} from '../../services/browserPortfolioState'
 import { 
   exportBackup, 
   parseBackup, 
@@ -36,7 +39,7 @@ export const BackupDropdown: React.FC<BackupDropdownProps> = ({ onDataImported }
   // Load data info
   useEffect(() => {
     const loadData = () => {
-      const txns = loadGuestTransactions()
+      const txns = readBrowserTransactions()
       setTransactions(txns)
       
       try {
@@ -53,9 +56,7 @@ export const BackupDropdown: React.FC<BackupDropdownProps> = ({ onDataImported }
     loadData()
     
     // Listen for transaction updates
-    const handleUpdate = () => loadData()
-    window.addEventListener('guestTransactionsUpdated', handleUpdate)
-    return () => window.removeEventListener('guestTransactionsUpdated', handleUpdate)
+    return subscribeBrowserPortfolioState(loadData)
   }, [])
 
   // Close dropdown when clicking outside

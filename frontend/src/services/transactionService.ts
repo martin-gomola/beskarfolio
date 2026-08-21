@@ -1,11 +1,13 @@
 import { api } from './api'
 import { Transaction, TransactionFormData } from '../types'
 import {
-  loadGuestTransactions,
-  addGuestTransaction,
-  updateGuestTransaction as updateLocalTransaction,
-  deleteGuestTransaction
-} from '../utils/guestStorage'
+  createBrowserTransaction,
+  deleteBrowserTransaction,
+  readBrowserTransactions,
+  updateBrowserTransaction,
+  writeBrowserTransactions,
+  type BrowserTransactionInput,
+} from './browserPortfolioState'
 import { getEffectiveCurrencyForTicker } from '../utils'
 
 /**
@@ -17,7 +19,7 @@ export const transactionService = {
    * Get all transactions from localStorage
    */
   getAll: async (): Promise<Transaction[]> => {
-    return loadGuestTransactions()
+    return readBrowserTransactions()
   },
 
   /**
@@ -54,7 +56,7 @@ export const transactionService = {
       if (data.withholding_tax) transactionData.withholding_tax = parseFloat(data.withholding_tax)
     }
 
-    return addGuestTransaction(transactionData)
+    return createBrowserTransaction(transactionData)
   },
 
   /**
@@ -77,12 +79,8 @@ export const transactionService = {
       withholding_tax: data.withholding_tax ? parseFloat(data.withholding_tax) : undefined,
     }
 
-    const success = updateLocalTransaction(id, updates)
-    if (success) {
-      const transactions = loadGuestTransactions()
-      const updated = transactions.find(t => t.id === id)
-      if (updated) return updated
-    }
+    const updated = updateBrowserTransaction(id, updates)
+    if (updated) return updated
     throw new Error('Transaction not found')
   },
 
@@ -90,14 +88,14 @@ export const transactionService = {
    * Delete a transaction from localStorage
    */
   delete: async (id: number): Promise<void> => {
-    deleteGuestTransaction(id)
+    deleteBrowserTransaction(id)
   },
 
   /**
    * Export transactions to CSV from localStorage
    */
   export: async (): Promise<Blob> => {
-    const transactions = loadGuestTransactions()
+    const transactions = readBrowserTransactions()
     const csv = [
       'date,ticker,shares,price,type,currency,gross_amount,withholding_tax',
       ...transactions.map(t =>
@@ -123,14 +121,8 @@ export const transactionService = {
       const lines = text.split('\n')
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
 
-      // Clear existing transactions if replace mode
-      if (mode === 'replace') {
-        const existing = loadGuestTransactions()
-        existing.forEach(t => deleteGuestTransaction(t.id))
-      }
-
       // Parse transactions
-      const newTransactions: Transaction[] = []
+      const transactionInputs: BrowserTransactionInput[] = []
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim()
         if (!line) continue
@@ -151,7 +143,7 @@ export const transactionService = {
         }
 
         if (txn.date && txn.ticker && (txn.shares || type === 'dividend') && txn.price) {
-          const transaction: Omit<Transaction, 'id' | 'created_at' | 'total_value'> = {
+          const transaction: BrowserTransactionInput = {
             date: txn.date,
             ticker: txn.ticker.toUpperCase(),
             type: type as 'buy' | 'sell' | 'dividend',
@@ -162,15 +154,15 @@ export const transactionService = {
             ...(type === 'dividend' && txn.withholding_tax ? { withholding_tax: parseFloat(txn.withholding_tax) } : {}),
           }
 
-          const created = addGuestTransaction(transaction)
-          newTransactions.push(created)
+          transactionInputs.push(transaction)
         }
       }
-      
+
+      const newTransactions = writeBrowserTransactions(transactionInputs, {
+        mode,
+        reason: 'import',
+      })
       console.log(`✅ Standard CSV: Saved ${newTransactions.length} transactions to localStorage`)
-      
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new Event('guestTransactionsUpdated'))
 
       return {
         status: 'success',
@@ -193,15 +185,9 @@ export const transactionService = {
       // Backend parsed the transactions, now save them to localStorage
       const parsedTransactions = response.data.transactions || []
 
-      // Clear existing transactions if replace mode
-      if (mode === 'replace') {
-        const existing = loadGuestTransactions()
-        existing.forEach(t => deleteGuestTransaction(t.id))
-      }
-
-      // Save parsed transactions to localStorage
       console.log(`💾 Saving ${parsedTransactions.length} transactions to localStorage...`)
       let skippedCount = 0
+      const transactionInputs: BrowserTransactionInput[] = []
       parsedTransactions.forEach((txn: any, index: number) => {
         const type = String(txn.type || '').toLowerCase()
         if (type !== 'buy' && type !== 'sell' && type !== 'dividend') {
@@ -210,7 +196,7 @@ export const transactionService = {
           return
         }
 
-        const transaction: Omit<Transaction, 'id' | 'created_at' | 'total_value'> = {
+        const transaction: BrowserTransactionInput = {
           date: txn.date,
           ticker: txn.ticker.toUpperCase(),
           type: type as 'buy' | 'sell' | 'dividend',
@@ -220,23 +206,24 @@ export const transactionService = {
           ...(type === 'dividend' && txn.gross_amount ? { gross_amount: parseFloat(txn.gross_amount) } : {}),
           ...(type === 'dividend' && txn.withholding_tax ? { withholding_tax: parseFloat(txn.withholding_tax) } : {}),
         }
-        addGuestTransaction(transaction)
+        transactionInputs.push(transaction)
       })
-      
+
+      const importedTransactions = writeBrowserTransactions(transactionInputs, {
+        mode,
+        reason: 'import',
+      })
       if (skippedCount > 0) {
         console.warn(`⚠️ Skipped ${skippedCount} transactions with invalid type`)
       }
-      
-      // Verify data was saved
-      const savedTransactions = loadGuestTransactions()
-      console.log(`✅ Saved ${savedTransactions.length} transactions to localStorage`)
 
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new Event('guestTransactionsUpdated'))
+      const savedTransactions = readBrowserTransactions()
+      console.log(`✅ Saved ${savedTransactions.length} transactions to localStorage`)
 
       return {
         ...response.data,
-        message: `Imported ${parsedTransactions.length} transactions to localStorage`
+        imported_count: importedTransactions.length,
+        message: `Imported ${importedTransactions.length} transactions to localStorage`
       }
     }
   }

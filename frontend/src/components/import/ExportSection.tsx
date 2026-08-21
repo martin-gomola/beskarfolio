@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { loadGuestTransactions } from '../../utils/guestStorage'
+import { readBrowserTransactions } from '../../services/browserPortfolioState'
 import { 
   exportBackup, 
   createBackup,
@@ -33,7 +33,7 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ onImportComplete }
 
   // Load transactions from localStorage
   useEffect(() => {
-    const txns = loadGuestTransactions()
+    const txns = readBrowserTransactions()
     setTransactions(txns)
   }, [])
 
@@ -329,4 +329,3 @@ export const ExportSection: React.FC<ExportSectionProps> = ({ onImportComplete }
     </>
   )
 }
-

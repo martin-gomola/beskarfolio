@@ -4,7 +4,7 @@
  */
 
 import { api } from './api'
-import { loadGuestTransactions } from '../utils/guestStorage'
+import { readBrowserTransactions } from './browserPortfolioState'
 import { TARGET_ALLOCATION_STORAGE_KEY } from '../utils/storageKeys'
 import type { TargetAllocation, AllocationStatus, RebalancePlan, RebalancePlanRequest } from '../types/allocation'
 
@@ -62,7 +62,7 @@ export const allocationService = {
    * Sends transactions and target allocations to backend for calculation
    */
   getStatus: async (): Promise<AllocationStatus> => {
-    const transactions = loadGuestTransactions()
+    const transactions = readBrowserTransactions()
     const target_allocations = loadTargetAllocation() || {}
 
     const response = await api.post('/api/allocation/status', {
@@ -77,7 +77,7 @@ export const allocationService = {
    * Sends transactions and target allocations to backend for calculation
    */
   getRebalancePlan: async (request: RebalancePlanRequest = {}): Promise<RebalancePlan> => {
-    const transactions = loadGuestTransactions()
+    const transactions = readBrowserTransactions()
     const target_allocations = loadTargetAllocation()
 
     if (!target_allocations || Object.keys(target_allocations).length === 0) {

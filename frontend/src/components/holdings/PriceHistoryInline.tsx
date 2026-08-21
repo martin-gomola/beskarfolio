@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceDot, ReferenceLine } from 'recharts'
 import { api } from '../../services'
-import { loadGuestTransactions, normalizeDate } from '../../utils/guestStorage'
+import { readBrowserTransactions } from '../../services/browserPortfolioState'
+import { normalizeDate } from '../../utils/guestStorage'
 import { formatCurrency } from '../../utils'
 
 interface PriceHistoryInlineProps {
@@ -78,7 +79,7 @@ export const PriceHistoryInline: React.FC<PriceHistoryInlineProps> = ({ ticker, 
 
   // Get transactions for this ticker
   const transactions = useMemo(() => {
-    const allTxns = loadGuestTransactions()
+    const allTxns = readBrowserTransactions()
     return allTxns
       .filter(t => t.ticker.toUpperCase() === ticker.toUpperCase())
       .map(t => {

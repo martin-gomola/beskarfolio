@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
+import {
+  readBrowserTransactions,
+  subscribeBrowserPortfolioState,
+} from '../services/browserPortfolioState'
 import { AnnualPerformanceData, AnnualPerformanceResponse } from '../types'
-import { loadGuestTransactions } from '../utils/guestStorage'
 // LocalStorage-only architecture
 import {
   getCachedAnnualPerformance,
@@ -29,7 +32,7 @@ export function useAnnualPerformance(): UseAnnualPerformanceReturn {
       setLoading(true)
       setError(null)
 
-      const transactions = loadGuestTransactions()  // Load from localStorage
+      const transactions = readBrowserTransactions()
 
       if (transactions.length === 0) {
         setPerformanceData({
@@ -124,8 +127,7 @@ export function useAnnualPerformance(): UseAnnualPerformanceReturn {
       refetchAnnualPerformance()
     }
 
-    window.addEventListener('guestTransactionsUpdated', handleTransactionUpdate)
-    return () => window.removeEventListener('guestTransactionsUpdated', handleTransactionUpdate)
+    return subscribeBrowserPortfolioState(handleTransactionUpdate)
   }, [refetchAnnualPerformance])
 
   return {

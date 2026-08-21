@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../../services'
-import { loadGuestTransactions } from '../../utils/guestStorage'
+import { readBrowserTransactions } from '../../services/browserPortfolioState'
 import { usePrivacyMode } from '../../hooks'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
 import { formatCurrency } from '../../utils'
@@ -42,7 +42,7 @@ export const DividendSummaryCard: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const transactions = loadGuestTransactions()
+        const transactions = readBrowserTransactions()
         const hasDividends = transactions.some(t => t.type === 'dividend')
         if (!hasDividends) {
           setData(null)

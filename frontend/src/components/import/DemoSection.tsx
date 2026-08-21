@@ -1,7 +1,5 @@
 import React, { useState } from 'react'
-import { api } from '../../services'
-import { GUEST_STORAGE_KEY } from '../../utils/constants'
-import { clearAllCaches, updateTransactionsHash } from '../../utils/guestCache'
+import { api, writeBrowserTransactions } from '../../services'
 
 interface DemoSectionProps {
   onImportComplete: () => void
@@ -27,27 +25,11 @@ export const DemoSection: React.FC<DemoSectionProps> = ({ onImportComplete }) =>
       const response = await api.post('/api/import/demo?mode=replace')
       
       if (response.data.success && response.data.transactions) {
-        // Clear ALL existing data and caches
-        console.log('🗑️ Clearing all data and caches from localStorage')
-        localStorage.removeItem(GUEST_STORAGE_KEY)
-        clearAllCaches()  // Clear performance/chart caches
-        
-        // Add demo transactions to localStorage with unique IDs based on date+ticker
-        const transactions = response.data.transactions.map((txn: any, index: number) => ({
-          ...txn,
-          id: `demo-${txn.date}-${txn.ticker}-${index}`,  // Unique ID per transaction
-          total_value: txn.shares * txn.price
-        }))
-        
-        console.log(`💾 Saving ${transactions.length} demo transactions to localStorage`)
-        localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(transactions))
-        
-        // Update transactions hash so cache knows data changed
-        updateTransactionsHash(transactions)
-        
-        // Dispatch custom event to notify other components
-        window.dispatchEvent(new Event('guestTransactionsUpdated'))
-        console.log('🔔 Dispatched guestTransactionsUpdated event')
+        console.log(`💾 Saving ${response.data.transactions.length} demo transactions to localStorage`)
+        writeBrowserTransactions(response.data.transactions, {
+          mode: 'replace',
+          reason: 'demo',
+        })
         
         console.log('✅ Demo portfolio loaded successfully!')
         alert(`✅ Demo portfolio loaded! ${response.data.imported_count} transactions imported to localStorage.`)
@@ -105,4 +87,3 @@ export const DemoSection: React.FC<DemoSectionProps> = ({ onImportComplete }) =>
     </div>
   )
 }
-

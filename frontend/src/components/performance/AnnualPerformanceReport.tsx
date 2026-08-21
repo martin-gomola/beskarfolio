@@ -6,7 +6,7 @@ import { usePrivacyMode } from '../../hooks'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
 import { PerformanceChart } from './PerformanceChart'
 import { api } from '../../services'
-import { loadGuestTransactions } from '../../utils/guestStorage'
+import { readBrowserTransactions } from '../../services/browserPortfolioState'
 import {
   getCachedChartData,
   cacheChartData,
@@ -641,7 +641,7 @@ export const AnnualPerformanceReport: React.FC = () => {
       setChartLoading(true)
       try {
         // Load transactions from localStorage
-        const transactions = loadGuestTransactions()
+        const transactions = readBrowserTransactions()
         
         if (!transactions || transactions.length === 0) {
           console.warn('⚠️ No transactions found')

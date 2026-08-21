@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:browser-state": "node --test scripts/browser-portfolio-state.test.mjs",
     "postbuild": "node scripts/inject-analytics.mjs",
     "preview": "vite preview"
   },

@@ -8,6 +8,8 @@ The browser-owned source of truth for a visitor's portfolio. It includes localSt
 
 This term exists because BeskarFolio is intentionally stateless on the backend: the browser owns transactions, while the backend calculates results from submitted data.
 
+The browser portfolio state module is the transaction read and write seam. It owns cache invalidation and emits one typed change notification after each logical mutation; callers do not write the transaction storage key or publish transaction events themselves.
+
 ### Price read model
 
 The backend-owned projection of cached price data for read-only callers. It includes latest prices, historical ranges, 52-week ranges, freshness status, snapshot-vs-CSV precedence, and market-date semantics.

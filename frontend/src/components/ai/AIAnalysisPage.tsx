@@ -25,6 +25,7 @@ import { loadAISettings } from '../../utils/aiSettings'
 import { taxService } from '../../services/taxService'
 import { transactionService } from '../../services/transactionService'
 import { api } from '../../services/api'
+import { subscribeBrowserPortfolioState } from '../../services/browserPortfolioState'
 import { ExchangeRateContext } from './prompts/types'
 
 interface AIAnalysisPageProps {
@@ -119,11 +120,11 @@ export const AIAnalysisPage: React.FC<AIAnalysisPageProps> = ({ holdings, summar
       void loadTransactions()
     }
 
-    window.addEventListener('guestTransactionsUpdated', handleTransactionsUpdated)
+    const unsubscribe = subscribeBrowserPortfolioState(handleTransactionsUpdated)
     window.addEventListener('storage', handleTransactionsUpdated)
 
     return () => {
-      window.removeEventListener('guestTransactionsUpdated', handleTransactionsUpdated)
+      unsubscribe()
       window.removeEventListener('storage', handleTransactionsUpdated)
     }
   }, [loadTransactions])

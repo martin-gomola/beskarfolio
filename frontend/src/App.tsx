@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 
 // Services
-import { api, priceService } from './services'
+import {
+  api,
+  priceService,
+  readBrowserTransactions,
+  writeBrowserTransactions,
+} from './services'
 
 // Hooks
 import {
@@ -12,7 +17,6 @@ import {
   usePrivacyMode,
   PrivacyProvider
 } from './hooks'
-import { clearAllCaches, updateTransactionsHash } from './utils/guestCache'
 
 // Common Components (always loaded - small)
 import { LocalStorageBanner } from './components/common/LocalStorageBanner'
@@ -213,10 +217,8 @@ const App: React.FC = () => {
     if (autoRefreshRunning.current) return false
     autoRefreshRunning.current = true
     try {
-      const raw = localStorage.getItem('beskarfolio_guest_transactions')
-      if (!raw) return false
-      const txns = JSON.parse(raw)
-      const tickers = [...new Set(txns.map((t: any) => t.ticker))] as string[]
+      const transactions = readBrowserTransactions()
+      const tickers = [...new Set(transactions.map(transaction => transaction.ticker))]
       if (tickers.length === 0) return false
       await priceService.updatePrices(tickers)
       window.dispatchEvent(new Event('prices-updated'))
@@ -462,18 +464,12 @@ const App: React.FC = () => {
                       onClick={async () => {
                         if (!confirm('Load demo portfolio (~€15k, 5 holdings) to try the app?')) return
                         try {
-                          clearAllCaches()
-
                           const { data } = await api.post('/api/import/demo?mode=replace')
                           if (data.success && data.transactions) {
-                            const transactions = data.transactions.map((txn: any, i: number) => ({
-                              ...txn,
-                              id: `demo-${txn.date}-${txn.ticker}-${i}`,
-                              total_value: txn.shares * txn.price
-                            }))
-                            localStorage.setItem('beskarfolio_guest_transactions', JSON.stringify(transactions))
-                            updateTransactionsHash(transactions)
-                            window.dispatchEvent(new Event('guestTransactionsUpdated'))
+                            writeBrowserTransactions(data.transactions, {
+                              mode: 'replace',
+                              reason: 'demo',
+                            })
                             handleDataUpdate()
                           }
                         } catch (e) {

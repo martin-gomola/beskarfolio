@@ -9,7 +9,8 @@
  */
 
 import { Transaction } from '../types/transaction'
-import { loadGuestTransactions, saveGuestTransactions, loadGuestPrices, saveGuestPrices, normalizeDate, type PriceData } from './guestStorage'
+import { readBrowserTransactions, replaceBrowserTransactions } from '../services/browserPortfolioState'
+import { loadGuestPrices, saveGuestPrices, normalizeDate, type PriceData } from './guestStorage'
 import { GUEST_STORAGE_KEY } from './constants'
 import {
   ALLOCATION_COLUMNS_STORAGE_KEY,
@@ -299,7 +300,7 @@ export function detectDevice(): string {
 
 export function createBackup(appVersion?: string): BackupData {
   // Load and normalize transactions (ensure YYYY-MM-DD dates)
-  const rawTransactions = loadGuestTransactions()
+  const rawTransactions = readBrowserTransactions()
   const transactions = rawTransactions.map(t => ({
     ...t,
     date: normalizeDate(t.date)
@@ -398,7 +399,7 @@ export function parseBackup(jsonString: string): BackupData | null {
 }
 
 export function compareBackup(backup: BackupData): ImportComparison {
-  const currentTransactions = loadGuestTransactions()
+  const currentTransactions = readBrowserTransactions()
   const warnings: string[] = []
   
   // Get current data's last update time
@@ -500,13 +501,13 @@ export function importBackup(backup: BackupData, options: ImportOptions = {}): {
     if (importTransactions && backup.transactions) {
       const normalizedTransactions = normalizeTransactions(backup.transactions)
       if (mergeTransactions) {
-        const current = loadGuestTransactions()
+        const current = readBrowserTransactions()
         const existingIds = new Set(current.map(t => t.id))
         const newTransactions = normalizedTransactions.filter(t => !existingIds.has(t.id))
-        saveGuestTransactions([...current, ...newTransactions])
+        replaceBrowserTransactions([...current, ...newTransactions], 'restore')
         imported.push(`${newTransactions.length} new transactions (merged)`)
       } else {
-        saveGuestTransactions(normalizedTransactions)
+        replaceBrowserTransactions(normalizedTransactions, 'restore')
         imported.push(`${backup.transactions.length} transactions`)
       }
     }
@@ -540,9 +541,6 @@ export function importBackup(backup: BackupData, options: ImportOptions = {}): {
         imported.push('allocation column settings')
       }
     }
-    
-    // Notify app of changes
-    window.dispatchEvent(new Event('guestTransactionsUpdated'))
     
     return { success: true, imported }
   } catch (e) {
