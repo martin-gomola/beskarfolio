@@ -5,13 +5,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PortfolioSummary } from '../types/portfolio'
 import { Holding } from '../types/holding'
-import { readBrowserPortfolio } from '../services/browserPortfolioState'
+import { readBrowserPortfolio, type BrowserPortfolioSource } from '../services/browserPortfolioState'
 
 interface UsePortfolioReturn {
   summary: PortfolioSummary | null
   holdings: Holding[]
   loading: boolean
   error: string | null
+  source: BrowserPortfolioSource
+  calculatedAt: number | null
   refetch: () => Promise<void>
 }
 
@@ -29,6 +31,8 @@ export function usePortfolio(): UsePortfolioReturn {
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [source, setSource] = useState<BrowserPortfolioSource>('empty')
+  const [calculatedAt, setCalculatedAt] = useState<number | null>(null)
 
   // Fetch portfolio data - memoized to prevent unnecessary re-renders
   // forceRefresh = true bypasses cache (for manual refresh/pull-to-refresh)
@@ -40,10 +44,13 @@ export function usePortfolio(): UsePortfolioReturn {
       const snapshot = await readBrowserPortfolio({ forceRefresh })
       setSummary(snapshot.summary)
       setHoldings(snapshot.holdings)
+      setSource(snapshot.source)
+      setCalculatedAt(snapshot.calculatedAt)
       setLoading(false)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to calculate portfolio'
       setError(message)
+      setSource(previous => previous === 'empty' ? previous : 'expired-cache')
       console.error('Error calculating portfolio:', err)
       setLoading(false)
     }
@@ -58,6 +65,8 @@ export function usePortfolio(): UsePortfolioReturn {
     holdings,
     loading,
     error,
+    source,
+    calculatedAt,
     // Manual refresh always forces fresh prices
     refetch: () => fetchData(true),
   }

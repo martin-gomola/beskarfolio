@@ -25,6 +25,7 @@ export interface BrowserPortfolioSnapshot {
   holdings: Holding[]
   transactions: Transaction[]
   source: BrowserPortfolioSource
+  calculatedAt: number | null
 }
 
 export type BrowserPortfolioChangeReason =
@@ -114,6 +115,7 @@ const emptySnapshot = (): BrowserPortfolioSnapshot => ({
   holdings: [],
   transactions: [],
   source: 'empty',
+  calculatedAt: null,
 })
 
 const fromCache = (
@@ -128,6 +130,7 @@ const fromCache = (
     holdings: cachedData.holdings || [],
     transactions,
     source,
+    calculatedAt: cachedData.cachedAt ?? null,
   }
 }
 
@@ -171,6 +174,7 @@ export async function readBrowserPortfolio(
       holdings: response.data.holdings || [],
       transactions,
       source: 'backend',
+      calculatedAt: Date.now(),
     }
 
     cacheSummary({

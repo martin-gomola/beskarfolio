@@ -100,7 +100,6 @@ interface Alert {
 interface AssetAllocationChartProps {
   holdings: Holding[]
   totalValue: number
-  onViewAllHoldings?: () => void
 }
 
 /**
@@ -112,7 +111,6 @@ interface AssetAllocationChartProps {
 export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({
   holdings,
   totalValue,
-  onViewAllHoldings,
 }) => {
   const [activeIndex, setActiveIndex] = useState<number | null>(null)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
@@ -411,15 +409,6 @@ export const AssetAllocationChart: React.FC<AssetAllocationChartProps> = ({
               })}
             </div>
 
-            {onViewAllHoldings && (
-              <button
-                type="button"
-                onClick={onViewAllHoldings}
-                className="mt-3 min-h-11 w-full rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 text-sm font-medium text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 lg:hidden"
-              >
-                View all {holdings.length} holdings
-              </button>
-            )}
           </div>
         </div>
       )}

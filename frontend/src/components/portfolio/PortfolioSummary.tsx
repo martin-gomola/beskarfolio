@@ -17,13 +17,20 @@ const formatNumber = (value: number): string => {
 interface PortfolioSummaryProps {
   summary: PortfolioSummaryType | null
   onRefreshPrices?: () => Promise<boolean>
+  portfolioSource?: 'empty' | 'cache' | 'backend' | 'expired-cache'
+  portfolioCalculatedAt?: number | null
 }
 
 /**
  * Portfolio Overview Card
  * Displays total value, invested amount, returns, and key metrics
  */
-export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary, onRefreshPrices }) => {
+export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
+  summary,
+  onRefreshPrices,
+  portfolioSource,
+  portfolioCalculatedAt,
+}) => {
   const { priceStatus } = usePriceStatus()
   const { isPrivate } = usePrivacyMode()
   const { performanceData, loading: perfLoading } = useAnnualPerformance()
@@ -134,6 +141,16 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary, onR
   
   const priceIndicator = getPriceIndicator()
 
+  const portfolioDataInfo = portfolioCalculatedAt
+    ? (() => {
+      const ageMinutes = Math.max(0, Math.floor((Date.now() - portfolioCalculatedAt) / 60000))
+      const ageLabel = ageMinutes < 1 ? 'just now' : ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.floor(ageMinutes / 60)}h ago`
+      if (portfolioSource === 'expired-cache') return { text: `Offline snapshot · ${ageLabel}`, color: 'text-amber-300' }
+      if (portfolioSource === 'cache') return { text: `Cached ${ageLabel}`, color: 'text-gray-400' }
+      return { text: `Updated ${ageLabel}`, color: 'text-gray-400' }
+    })()
+    : null
+
   useEffect(() => {
     if (!isInfoOpen) return
 
@@ -163,6 +180,12 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ summary, onR
           <h2 className="text-xl sm:text-2xl font-semibold text-white tracking-tight font-heading">Portfolio Overview</h2>
           <p className="text-sm text-gray-500 mt-0.5">
             {summary.holdings_count} holdings · {summary.transaction_count} transactions
+            {portfolioDataInfo && (
+              <span className={`mt-0.5 block sm:mt-0 sm:ml-2 sm:inline ${portfolioDataInfo.color}`}>
+                <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>
+                {portfolioDataInfo.text}
+              </span>
+            )}
             {priceStatus && priceStatus.has_prices && (
               <span className={`${pricesNeedAttention ? 'hidden' : 'mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex'}`}>
                 <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>

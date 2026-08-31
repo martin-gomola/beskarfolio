@@ -38,7 +38,7 @@ export function LocalStorageBanner() {
   if (!isVisible) return null
 
   return (
-    <div className="bg-accent-500/10 border-b border-accent-500/30 pt-[env(safe-area-inset-top)]">
+    <div className="bg-accent-500/10 border-b border-accent-500/30">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-start gap-3">
           {/* Database Icon */}

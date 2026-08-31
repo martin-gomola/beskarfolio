@@ -3,9 +3,10 @@
   "short_name": "Beskar",
   "description": "Personal portfolio tracker",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f1419",
-  "theme_color": "#0f1419",
+  "background_color": "#0f1c14",
+  "theme_color": "#0f1c14",
   "orientation": "portrait-primary",
   "icons": [
     {

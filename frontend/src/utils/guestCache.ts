@@ -25,6 +25,7 @@ interface CacheEntry<T> {
 interface PortfolioCacheData {
   summary: PortfolioSummary
   holdings: Holding[]
+  cachedAt?: number
 }
 
 interface CacheReadOptions {
@@ -180,7 +181,8 @@ export function getCachedSummary(options: CacheReadOptions = {}): PortfolioCache
     if (import.meta.env.DEV) console.log(`⚡ Using cached portfolio summary (age: ${Math.round(age / 1000)}s)`)
     return {
       summary: parsed.summary,
-      holdings
+      holdings,
+      cachedAt: parsed.cachedAt,
     }
   } catch (err) {
     console.warn('Failed to load cached summary:', err)

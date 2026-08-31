@@ -178,7 +178,15 @@ const getTabFromHash = (): TabType => {
 
 const App: React.FC = () => {
   // Use custom hook for portfolio data management
-  const { summary, holdings, loading, refetch: handleDataUpdate } = usePortfolio()
+  const {
+    summary,
+    holdings,
+    loading,
+    error: portfolioError,
+    source: portfolioSource,
+    calculatedAt: portfolioCalculatedAt,
+    refetch: handleDataUpdate,
+  } = usePortfolio()
   const [activeTab, setActiveTab] = useState<TabType>(getTabFromHash)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -230,16 +238,6 @@ const App: React.FC = () => {
       autoRefreshRunning.current = false
     }
   }, [handleDataUpdate])
-
-  const handleViewAllHoldings = useCallback(() => {
-    setMobileHoldingsExpanded(true)
-    window.requestAnimationFrame(() => {
-      document.getElementById('holdings-detail')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
-    })
-  }, [])
 
   useEffect(() => {
     const listener = () => { handleAutoRefresh() }
@@ -322,7 +320,7 @@ const App: React.FC = () => {
 
       {/* PWA Update Banner */}
       {updateAvailable && (
-        <div className="bg-accent-600 text-white text-center text-sm px-4 pb-2.5 flex items-center justify-center gap-3 pt-[max(env(safe-area-inset-top),0.625rem)]">
+        <div className="bg-accent-600 text-white text-center text-sm px-4 py-2.5 flex items-center justify-center gap-3">
           <span>A new version is available</span>
           <button
             onClick={reloadForUpdate}
@@ -335,7 +333,7 @@ const App: React.FC = () => {
       
       {/* Header - Single row: menu/tabs | actions */}
       <header className="glass-nav border-b border-white/[0.06] sticky top-0 z-30">
-        <div className={`max-w-7xl mx-auto px-4 sm:px-6 py-2 ${!updateAvailable ? 'pt-[max(env(safe-area-inset-top),0.5rem)] sm:pt-2' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2">
           <div className="flex items-center justify-between gap-3">
             {/* Mobile menu moved to the primary toolbar position */}
             <button
@@ -401,36 +399,65 @@ const App: React.FC = () => {
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fade-in">
-            <PortfolioCard summary={summary} onRefreshPrices={handleAutoRefresh} />
-
-            {summary && summary.transaction_count > 0 && holdings.length > 0 && (
-              <Suspense fallback={<div className="h-64 bg-surface-elevated rounded-lg animate-pulse" />}>
-                <AssetAllocationChart
-                  holdings={holdings}
-                  totalValue={summary.total_value}
-                  onViewAllHoldings={handleViewAllHoldings}
+            {portfolioError && !summary ? (
+              <div role="alert" className="glass rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-4 sm:p-5">
+                <h2 className="text-base font-semibold text-amber-100">Portfolio unavailable</h2>
+                <p className="mt-1 text-sm leading-relaxed text-amber-100/70">
+                  Your transactions are still saved on this device. Reconnect to calculate the latest portfolio values.
+                </p>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => void handleDataUpdate()}
+                    className="min-h-11 rounded-lg bg-amber-300/15 px-3 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-300/25 focus:outline-none focus:ring-2 focus:ring-amber-300/50"
+                  >
+                    Try again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigateToTab('transactions')}
+                    className="min-h-11 rounded-lg border border-white/[0.08] px-3 text-sm font-medium text-gray-200 transition-colors hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-accent-500/50"
+                  >
+                    View transactions
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <PortfolioCard
+                  summary={summary}
+                  onRefreshPrices={handleAutoRefresh}
+                  portfolioSource={portfolioSource}
+                  portfolioCalculatedAt={portfolioCalculatedAt}
                 />
-              </Suspense>
-            )}
 
-            <div id="holdings-detail" className="scroll-mt-20">
-              <HoldingsTable
-                holdings={holdings}
-                onUpdate={handleDataUpdate}
-                mobileExpanded={mobileHoldingsExpanded}
-                onMobileExpandedChange={setMobileHoldingsExpanded}
-              />
-            </div>
+                {summary && summary.transaction_count > 0 && holdings.length > 0 && (
+                  <Suspense fallback={<div className="h-64 bg-surface-elevated rounded-lg animate-pulse" />}>
+                    <AssetAllocationChart
+                      holdings={holdings}
+                      totalValue={summary.total_value}
+                    />
+                  </Suspense>
+                )}
 
-            {summary && summary.transaction_count > 0 && (
-              <Suspense fallback={<div className="h-32 bg-surface-elevated rounded-lg animate-pulse" />}>
-                <DividendSummaryCard />
-              </Suspense>
-            )}
+                <div id="holdings-detail" className="scroll-mt-20">
+                  <HoldingsTable
+                    holdings={holdings}
+                    onUpdate={handleDataUpdate}
+                    mobileExpanded={mobileHoldingsExpanded}
+                    onMobileExpandedChange={setMobileHoldingsExpanded}
+                  />
+                </div>
 
-            {/* Empty state for new users */}
-            {(!summary || summary.transaction_count === 0) && (
-              <div className="bg-surface-elevated rounded-lg p-6 sm:p-12 border border-gray-800 text-center">
+                {summary && summary.transaction_count > 0 && (
+                  <Suspense fallback={<div className="h-32 bg-surface-elevated rounded-lg animate-pulse" />}>
+                    <DividendSummaryCard />
+                  </Suspense>
+                )}
+
+                {/* Empty state for new users */}
+                {(!summary || summary.transaction_count === 0) && (
+                  <div className="bg-surface-elevated rounded-lg p-6 sm:p-12 border border-gray-800 text-center">
                 <div className="max-w-md mx-auto">
                   <div className="text-5xl sm:text-6xl mb-3 sm:mb-4">📊</div>
                   <h2 className="text-xl sm:text-2xl font-bold text-gray-100 mb-2 font-heading">Welcome to BeskarFolio</h2>
@@ -486,7 +513,9 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -600,10 +629,7 @@ const App: React.FC = () => {
           {/* Drawer - All navigation items */}
           <div
             className="fixed inset-y-0 left-0 w-72 max-w-[86vw] bg-surface-dark/80 backdrop-blur-2xl border-r border-white/[0.06] z-50 sm:hidden overflow-y-auto"
-            style={{
-              paddingTop: 'max(env(safe-area-inset-top), 0.75rem)',
-              paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)',
-            }}
+            style={{ padding: '0.75rem 0' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-4 border-b border-white/[0.06]">
@@ -654,9 +680,9 @@ const App: React.FC = () => {
           scrollDirection === 'down' ? 'pointer-events-none' : ''
         }`}
         style={{
-          bottom: 'max(12px, env(safe-area-inset-bottom))',
+          bottom: '12px',
           transform: scrollDirection === 'down'
-            ? 'translateY(calc(100% + max(16px, env(safe-area-inset-bottom)) + 4px))'
+            ? 'translateY(calc(100% + 20px))'
             : 'translateY(0)',
         }}
       >
