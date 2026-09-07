@@ -9,7 +9,7 @@ import random
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Protocol, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import yfinance as yf
@@ -59,16 +59,6 @@ class PriceProvider(Enum):
 
 
 @dataclass(frozen=True)
-class PriceData:
-    """Standardized price data structure."""
-
-    price: float
-    date: datetime
-    source: PriceProvider
-    age_hours: Optional[float] = None
-
-
-@dataclass(frozen=True)
 class HistoricalSeriesCacheEntry:
     """Cached view of a ticker's historical CSV, keyed by file mtime."""
 
@@ -78,21 +68,6 @@ class HistoricalSeriesCacheEntry:
     latest_dt_utc: datetime
     latest_date_str: str
     latest_close: float
-
-
-class PriceProviderProtocol(Protocol):
-    """Protocol for price provider implementations."""
-
-    def fetch_current_price(self, ticker: str) -> Optional[float]:
-        ...
-
-    def fetch_historical_prices(
-        self,
-        ticker: str,
-        start_date: date,
-        end_date: date,
-    ) -> Optional[pd.DataFrame]:
-        ...
 
 
 _historical_series_cache: Dict[str, HistoricalSeriesCacheEntry] = {}

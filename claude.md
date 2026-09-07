@@ -60,7 +60,6 @@ beskarfolio/
 │   │   ├── currency_service.py  # Currency conversion
 │   │   ├── tax_free.py       # Tax-free calculations (FIFO)
 │   │   ├── annual_performance.py  # Year-over-year performance
-│   │   ├── realized_gains.py # Realized gains tracking
 │   │   └── allocation.py     # Portfolio allocation logic
 │   ├── data/
 │   │   └── historical_prices/  # CSV files with historical prices
@@ -577,7 +576,6 @@ If `make deploy` suddenly becomes slow (10+ minutes):
   - `currency_service.py` - Currency conversion
   - `tax_free.py` - Tax-free calculations (FIFO)
   - `annual_performance.py` - Year-over-year performance
-  - `realized_gains.py` - Realized gains tracking
 - **Configuration**: `backend/config/settings.py` (all env vars)
 
 ### Automation Scripts (Root Level)
