@@ -380,6 +380,59 @@ def _normalize_sector(sector: str) -> str:
     return SECTOR_NORMALIZE.get(sector, sector if len(sector) < 15 else 'Other')
 
 
+def _build_ticker_profile(ticker: str, data: Optional[dict] = None) -> dict:
+    """Build the shared Finnhub or fallback ticker profile payload."""
+    is_etf = _is_etf_by_pattern(ticker)
+    if data and data.get("name"):
+        country = data.get("country", "US")
+        return {
+            "ticker": ticker,
+            "name": data.get("name", ticker),
+            "sector": "ETF/Index" if is_etf else _normalize_sector(data.get("finnhubIndustry", "")),
+            "industry": data.get("finnhubIndustry", ""),
+            "country": country,
+            "region": _get_region_from_country(country),
+            "isETF": is_etf,
+            "exchange": data.get("exchange", ""),
+            "currency": data.get("currency", "USD"),
+            "source": "finnhub",
+        }
+
+    if ticker.endswith(('.DE', '.F', '.PA', '.AS', '.MI', '.L')):
+        region = "EU"
+    elif ticker.endswith(('.HK', '.T', '.SS')):
+        region = "Asia/EM"
+    else:
+        region = "US"
+
+    return {
+        "ticker": ticker,
+        "name": ticker,
+        "sector": "ETF/Index" if is_etf else "Other",
+        "industry": "",
+        "country": "DE" if region == "EU" else ("HK" if region == "Asia/EM" else "US"),
+        "region": region,
+        "isETF": is_etf,
+        "exchange": "",
+        "currency": "EUR" if region == "EU" else "USD",
+        "source": "fallback",
+    }
+
+
+def _fetch_ticker_profile(ticker: str, finnhub_key: str) -> dict:
+    if finnhub_key:
+        resp = http_requests.get(
+            "https://finnhub.io/api/v1/stock/profile2",
+            params={"symbol": ticker, "token": finnhub_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data and data.get("name"):
+            return _build_ticker_profile(ticker, data)
+    return _build_ticker_profile(ticker)
+
+
 @router.get("/api/tickers/{ticker}/profile")
 @limiter.limit("60/minute")
 async def get_ticker_profile(request: Request, ticker: str):
@@ -405,68 +458,13 @@ async def get_ticker_profile(request: Request, ticker: str):
     # Try Finnhub first
     finnhub_key = getattr(settings, "FINNHUB_API_KEY", "")
     
-    if finnhub_key:
-        try:
-            # Finnhub stock profile endpoint
-            url = "https://finnhub.io/api/v1/stock/profile2"
-            params = {"symbol": ticker, "token": finnhub_key}
-            
-            resp = http_requests.get(url, params=params, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            
-            if data and data.get("name"):
-                # Detect if ETF (Finnhub doesn't have explicit field, use patterns)
-                is_etf = _is_etf_by_pattern(ticker)
-                
-                country = data.get("country", "US")
-                sector = _normalize_sector(data.get("finnhubIndustry", ""))
-                
-                # ETFs get special sector
-                if is_etf:
-                    sector = "ETF/Index"
-                
-                return {
-                    "success": True,
-                    "ticker": ticker,
-                    "name": data.get("name", ticker),
-                    "sector": sector,
-                    "industry": data.get("finnhubIndustry", ""),
-                    "country": country,
-                    "region": _get_region_from_country(country),
-                    "isETF": is_etf,
-                    "exchange": data.get("exchange", ""),
-                    "currency": data.get("currency", "USD"),
-                    "source": "finnhub"
-                }
-        except Exception as e:
+    try:
+        return {"success": True, **_fetch_ticker_profile(ticker, finnhub_key)}
+    except Exception as e:
+        if finnhub_key:
             logger.warning(f"Finnhub profile fetch failed for {ticker}: {e}")
-    
-    # Fallback: pattern-based detection
-    is_etf = _is_etf_by_pattern(ticker)
-    
-    # Detect region from ticker suffix
-    region = "US"
-    if ticker.endswith('.DE') or ticker.endswith('.F'):
-        region = "EU"
-    elif ticker.endswith('.PA') or ticker.endswith('.AS') or ticker.endswith('.MI') or ticker.endswith('.L'):
-        region = "EU"
-    elif ticker.endswith('.HK') or ticker.endswith('.T') or ticker.endswith('.SS'):
-        region = "Asia/EM"
-    
-    return {
-        "success": True,
-        "ticker": ticker,
-        "name": ticker,  # Unknown without API
-        "sector": "ETF/Index" if is_etf else "Other",
-        "industry": "",
-        "country": "DE" if region == "EU" else ("HK" if region == "Asia/EM" else "US"),
-        "region": region,
-        "isETF": is_etf,
-        "exchange": "",
-        "currency": "EUR" if region == "EU" else "USD",
-        "source": "fallback"
-    }
+
+    return {"success": True, **_build_ticker_profile(ticker)}
 
 
 @router.post("/api/tickers/profiles/batch")
@@ -500,56 +498,7 @@ async def get_ticker_profiles_batch(request: Request, tickers: List[str]):
             time.sleep(0.1)  # 100ms delay = max 600/min (under Finnhub's 60/min limit is per endpoint)
         
         try:
-            if finnhub_key:
-                url = "https://finnhub.io/api/v1/stock/profile2"
-                params = {"symbol": ticker, "token": finnhub_key}
-                
-                resp = http_requests.get(url, params=params, timeout=10)
-                resp.raise_for_status()
-                data = resp.json()
-                
-                if data and data.get("name"):
-                    is_etf = _is_etf_by_pattern(ticker)
-                    country = data.get("country", "US")
-                    sector = _normalize_sector(data.get("finnhubIndustry", ""))
-                    
-                    if is_etf:
-                        sector = "ETF/Index"
-                    
-                    profiles[ticker] = {
-                        "ticker": ticker,
-                        "name": data.get("name", ticker),
-                        "sector": sector,
-                        "industry": data.get("finnhubIndustry", ""),
-                        "country": country,
-                        "region": _get_region_from_country(country),
-                        "isETF": is_etf,
-                        "exchange": data.get("exchange", ""),
-                        "currency": data.get("currency", "USD"),
-                        "source": "finnhub"
-                    }
-                    continue
-            
-            # Fallback for this ticker
-            is_etf = _is_etf_by_pattern(ticker)
-            region = "US"
-            if ticker.endswith('.DE') or ticker.endswith('.F'):
-                region = "EU"
-            elif ticker.endswith('.PA') or ticker.endswith('.AS'):
-                region = "EU"
-            
-            profiles[ticker] = {
-                "ticker": ticker,
-                "name": ticker,
-                "sector": "ETF/Index" if is_etf else "Other",
-                "industry": "",
-                "country": "DE" if region == "EU" else "US",
-                "region": region,
-                "isETF": is_etf,
-                "exchange": "",
-                "currency": "EUR" if region == "EU" else "USD",
-                "source": "fallback"
-            }
+            profiles[ticker] = _fetch_ticker_profile(ticker, finnhub_key)
             
         except Exception as e:
             logger.warning(f"Failed to get profile for {ticker}: {e}")

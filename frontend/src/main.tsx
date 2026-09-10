@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
-import { ErrorBoundary, ToastProvider } from './components/common'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { initWebMCP } from './utils/webmcp'
 import './index.css'
 
@@ -35,9 +35,7 @@ if ('serviceWorker' in navigator) {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <ToastProvider>
-        <App />
-      </ToastProvider>
+      <App />
     </ErrorBoundary>
   </React.StrictMode>,
 )

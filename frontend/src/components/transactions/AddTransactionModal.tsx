@@ -1,6 +1,4 @@
 import React, { useState, useRef } from 'react'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
 import { transactionService } from '../../services'
 import { TransactionFormData } from '../../types'
 import { getEffectiveCurrencyForTicker, isStrongEurTicker, getDefaultWithholding, normalizeDecimal } from '../../utils'
@@ -26,7 +24,6 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     price: '',
     currency: 'USD'
   })
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -79,8 +76,7 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     setError('')
 
     try {
-      const formattedDate = selectedDate.toISOString().split('T')[0]
-      const submitData = { ...formData, date: formattedDate }
+      const submitData = { ...formData }
       if (isDividend) {
         submitData.shares = '1'
       }
@@ -306,13 +302,11 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
                 Date
               </label>
-              <DatePicker
-                selected={selectedDate}
-                onChange={(date: Date | null) => date && setSelectedDate(date)}
-                dateFormat="MMM d, yyyy"
-                    className="w-full px-4 py-3 bg-surface-elevated border border-white/5 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500/50 text-white"
-                wrapperClassName="w-full"
-                calendarClassName="dark-calendar"
+              <input
+                type="date"
+                value={formData.date}
+                onChange={(event) => setFormData((current) => ({ ...current, date: event.target.value }))}
+                className="w-full px-4 py-3 bg-surface-elevated border border-white/5 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500/50 text-white"
                 required
               />
             </div>

@@ -33,10 +33,6 @@ export const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true'
 export const GUEST_STORAGE_KEY = 'beskarfolio_guest_transactions'
 export const GUEST_PRICES_KEY = 'beskarfolio_guest_prices'
 
-// Time Constants
-export const ONE_HOUR_MS = 3600000
-export const ONE_DAY_MS = 86400000
-
 // Chart Colors
 export const CHART_COLORS = [
   '#3b82f6', // blue
@@ -51,24 +47,3 @@ export const CHART_COLORS = [
   '#6366f1', // indigo
   '#84cc16', // lime
 ]
-
-// Import Types
-export const IMPORT_TYPES = {
-  STANDARD: 'standard',
-  IBKR: 'ibkr',
-} as const
-
-// Transaction Types
-export const TRANSACTION_TYPES = {
-  BUY: 'buy',
-  SELL: 'sell',
-} as const
-
-// Currency Types
-export const CURRENCIES = {
-  EUR: 'EUR',
-  USD: 'USD',
-} as const
-
-// Slovak Tax Rule
-export const TAX_FREE_DAYS = 365

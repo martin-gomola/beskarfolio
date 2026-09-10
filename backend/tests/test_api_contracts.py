@@ -288,6 +288,16 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(len(payload["data_points"]), 1)
         self.assertIn("portfolio_return_pct", payload["data_points"][0])
 
+    def test_ticker_profile_fallback_is_shared_by_single_and_batch_routes(self) -> None:
+        with patch("api.prices.settings.FINNHUB_API_KEY", ""):
+            single = self.client.get("/api/tickers/0700.HK/profile")
+            batch = self.client.post("/api/tickers/profiles/batch", json=["0700.HK"])
+
+        self.assertEqual(single.status_code, 200)
+        self.assertEqual(batch.status_code, 200)
+        self.assertEqual(single.json()["region"], "Asia/EM")
+        self.assertEqual(batch.json()["profiles"]["0700.HK"]["region"], "Asia/EM")
+
 
 if __name__ == "__main__":
     unittest.main()

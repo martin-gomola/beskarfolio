@@ -21,7 +21,7 @@ from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from config.settings import APP_VERSION
-from api import routes, admin, transactions, portfolio, prices, analytics, imports as import_routes, allocation, webmcp
+from api import routes, transactions, portfolio, prices, analytics, imports as import_routes, allocation, webmcp
 
 # Rate limiter configuration
 # Uses client IP for rate limiting (works behind reverse proxy with X-Forwarded-For)
@@ -185,7 +185,6 @@ app.include_router(prices.router)  # Price endpoints (latest, range, status, upd
 app.include_router(analytics.router)  # Analytics (annual, tax-free, performance)
 app.include_router(import_routes.router)  # Import endpoints (IBKR, demo)
 app.include_router(allocation.router)  # Allocation & rebalancing
-app.include_router(admin.router)  # Admin logs
 app.include_router(webmcp.router)  # WebMCP / A2A discovery manifests
 
 if __name__ == "__main__":

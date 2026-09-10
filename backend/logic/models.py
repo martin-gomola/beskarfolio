@@ -45,19 +45,6 @@ class Transaction(BaseModel):
         return v
 
 
-class TransactionResponse(BaseModel):
-    id: int
-    ticker: str
-    type: str
-    date: str
-    shares: float
-    price: float
-    currency: str
-    total_value: float
-    gross_amount: Optional[float] = None
-    withholding_tax: Optional[float] = None
-
-
 class HoldingResponse(BaseModel):
     ticker: str
     shares: float
@@ -339,18 +326,5 @@ class TaxFreeRequest(BaseModel):
     @classmethod
     def validate_transactions_limit(cls, v: Optional[List[dict]]) -> Optional[List[dict]]:
         if v is not None and len(v) > MAX_TRANSACTIONS:
-            raise ValueError(f'Too many transactions (max {MAX_TRANSACTIONS})')
-        return v
-
-
-class PerformanceHistoryRequest(BaseModel):
-    """Request model for performance history endpoint"""
-    transactions: List[dict]
-    benchmark: Optional[str] = "SXR8.DE"
-
-    @field_validator('transactions')
-    @classmethod
-    def validate_transactions_limit(cls, v: List[dict]) -> List[dict]:
-        if len(v) > MAX_TRANSACTIONS:
             raise ValueError(f'Too many transactions (max {MAX_TRANSACTIONS})')
         return v
