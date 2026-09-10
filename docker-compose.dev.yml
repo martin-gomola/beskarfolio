@@ -13,7 +13,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: production  # Skip builder stage in dev for speed
+      target: development
     user: root  # Run as root in dev mode to avoid Podman permission issues
     volumes:
       - ./backend:/app  # Live reload for backend code

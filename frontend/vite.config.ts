@@ -120,4 +120,12 @@ export default defineConfig({
       'Expires': '0',
     },
   },
+  preview: {
+    headers: {
+      'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet, noimageindex',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'no-referrer',
+    },
+  },
 })

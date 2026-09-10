@@ -274,7 +274,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onDataCleared }) => 
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const terminal = useTerminal()
-  const { checkForUpdate, checking: checkingUpdate, updateAvailable } = useServiceWorkerUpdate()
+  const { applyUpdate, checkForUpdate, checking: checkingUpdate, updateAvailable } = useServiceWorkerUpdate()
 
   const dataInfo = useMemo(() => {
     try {
@@ -631,10 +631,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ onDataCleared }) => 
             </div>
             {updateAvailable || updateCheckResult === 'update' ? (
               <button
-                onClick={() => window.location.reload()}
+                onClick={applyUpdate}
                 className="px-3 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-xs flex items-center gap-1.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
               >
-                Reload to update
+                Update now
               </button>
             ) : (
               <button

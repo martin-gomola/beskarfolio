@@ -62,3 +62,13 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8060"]
+
+FROM production AS development
+
+COPY requirements-dev.txt .
+RUN --mount=type=cache,target=/root/.cache/pip,sharing=locked \
+    pip install -r requirements-dev.txt
+
+# Keep the default Docker/Render output production-only. Development Compose
+# selects the stage above explicitly.
+FROM production AS final

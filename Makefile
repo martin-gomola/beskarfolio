@@ -1,6 +1,6 @@
 # BeskarFolio - Minimal Portfolio Tracker
 
-.PHONY: help setup dev start stop restart restart-frontend restart-backend logs rebuild rebuild-dev rebuild-frontend rebuild-backend clean status deploy deploy-front deploy-back update setup-cron cron-log sync commit price-commit rf rb
+.PHONY: help ensure-env setup check dev start stop restart restart-frontend restart-backend logs rebuild rebuild-dev rebuild-frontend rebuild-backend clean status deploy deploy-front deploy-back update setup-cron cron-log sync commit price-commit rf rb
 
 # Compose environment handling:
 # - Compose only auto-loads a root `.env`
@@ -37,6 +37,7 @@ help:
 	@echo "   ├─ make setup     - Initial setup (build + start, run once)"
 	@echo ""
 	@echo "   Daily development:"
+	@echo "   ├─ make check     - Run frontend, PWA, privacy, and backend checks"
 	@echo "   ├─ make dev       - Start dev mode (live reload, port 3000, fast!)"
 	@echo "   ├─ make logs      - View logs (Ctrl+C to exit)"
 	@echo "   ├─ make stop      - Stop all services"
@@ -83,12 +84,29 @@ help:
 	@echo "   Backend API:   http://localhost:8060"
 	@echo "   API Docs:      http://localhost:8060/docs"
 
+ensure-env:
+	@if [ ! -f "$(ENV_FILE)" ]; then \
+		cp config/env.example "$(ENV_FILE)"; \
+		echo "Created $(ENV_FILE)"; \
+	fi
+
+check: ensure-env
+	@bash scripts/check_privacy.sh
+	@$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml build frontend backend
+	@$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps frontend npm run test:browser-state
+	@$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps \
+		-v "$(CURDIR)/scripts:/scripts:ro" \
+		-v "$(CURDIR)/backend/data:/backend/data:ro" \
+		-e LOG_LEVEL=ERROR backend python -m unittest discover -s tests
+	@git diff --check
+	@echo "✅ Checks passed"
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # LOCALHOST DEVELOPMENT COMMANDS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # First time setup
-setup:
+setup: ensure-env
 	@echo "🏗️  Setting up BeskarFolio (first time)..."
 	@echo "🔨 Building Docker images..."
 	$(COMPOSE) build
@@ -108,7 +126,7 @@ setup:
 	@echo "   • Use 'make stop' to stop services"
 
 # Start production mode locally (port 8080)
-start:
+start: ensure-env
 	@echo "🚀 Starting production mode..."
 	@echo "📦 Building if needed..."
 	$(COMPOSE) up -d --build
@@ -120,7 +138,7 @@ start:
 	@echo "💡 Use 'make logs' to view logs"
 
 # Start development mode (live reload, port 3000) - FAST!
-dev:
+dev: ensure-env
 	@echo "🚀 Starting development mode (fast start, no rebuild)..."
 	@echo "📝 Live reload enabled for backend and frontend"
 	FRONTEND_PORT=$(DEV_FRONTEND_SHADOW_PORT) $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml up -d
@@ -279,7 +297,7 @@ cron-log:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Deploy both frontend and backend
-deploy:
+deploy: ensure-env
 	@echo "🚀 Deploying BeskarFolio (frontend + backend)..."
 	@echo "💡 Using BuildKit for optimized builds"
 	@echo ""
@@ -310,10 +328,14 @@ deploy-front:
 	fi
 	@echo "📦 Building frontend locally (fast!)..."
 	@cd frontend && npm run build
-	@echo "🐳 Copying to container..."
-	@docker cp frontend/dist/. beskarfolio-web:/usr/share/nginx/html/
-	@echo "🔄 Reloading nginx..."
-	@docker exec beskarfolio-web nginx -s reload 2>/dev/null || true
+	@CID=$$($(COMPOSE) ps -q frontend); \
+		if [ -z "$$CID" ]; then echo "❌ Frontend container is not running. Run 'make start' or 'make deploy' first."; exit 1; fi; \
+		echo "🧹 Removing old assets..."; \
+		docker exec "$$CID" sh -c 'rm -rf /usr/share/nginx/html/*'; \
+		echo "🐳 Copying new build..."; \
+		docker cp frontend/dist/. "$$CID":/usr/share/nginx/html/; \
+		echo "🔄 Reloading nginx..."; \
+		docker exec "$$CID" nginx -s reload 2>/dev/null || true
 	@echo "✅ Frontend deployed!"
 	@echo "🌐 http://localhost:8080"
 
@@ -339,6 +361,7 @@ sync:
 commit:
 	@echo "📝 Staging all changes..."
 	@git add -A
+	@python3 scripts/security/pii_scan.py --staged
 	@echo ""
 	@echo "💬 Enter commit message:"
 	@bash -c 'read -p "> " msg; if [ -z "$$msg" ]; then echo "❌ Commit cancelled (empty message)"; exit 1; fi; git commit -m "$$msg"'

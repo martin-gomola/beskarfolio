@@ -33,6 +33,10 @@ class MemoryStorage {
 globalThis.localStorage = new MemoryStorage()
 globalThis.window = new EventTarget()
 globalThis.window.location = { hostname: 'localhost' }
+Object.defineProperty(globalThis, 'navigator', {
+  value: { userAgent: 'Node.js' },
+  configurable: true,
+})
 
 let api
 let backupService
@@ -288,4 +292,46 @@ test('keeps a persisted mutation successful when a listener fails', () => {
   unsubscribeObserved()
   assert.deepEqual(browserPortfolioState.readBrowserTransactions(), [transaction])
   assert.deepEqual(observed, ['replace'])
+})
+
+test('keeps a service-worker update waiting until the user accepts it', async () => {
+  const originalNavigator = globalThis.navigator
+  const messages = []
+  let updateCalls = 0
+  const waitingWorker = { postMessage: message => messages.push(message) }
+  const registration = {
+    waiting: waitingWorker,
+    installing: null,
+    addEventListener() {},
+    async update() { updateCalls += 1 },
+  }
+
+  Object.defineProperty(globalThis, 'navigator', {
+    value: {
+      userAgent: 'Node.js',
+      serviceWorker: {
+        controller: {},
+        getRegistration: async () => registration,
+      },
+    },
+    configurable: true,
+  })
+
+  try {
+    const lifecycle = await vite.ssrLoadModule('/src/platform/updateLifecycle.ts?test=waiting')
+    const observed = []
+    const unsubscribe = lifecycle.subscribeToUpdateLifecycle(worker => observed.push(worker))
+
+    assert.equal(await lifecycle.checkForUpdate(), 'update-found')
+    assert.deepEqual(observed, [null, waitingWorker])
+    assert.equal(updateCalls, 0)
+    lifecycle.applyWaitingUpdate()
+    assert.deepEqual(messages, [{ type: 'SKIP_WAITING' }])
+    unsubscribe()
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: originalNavigator,
+      configurable: true,
+    })
+  }
 })

@@ -196,7 +196,7 @@ const App: React.FC = () => {
   const scrollDirection = useScrollDirection(15)
 
   // PWA update detection
-  const { updateAvailable, reload: reloadForUpdate } = useServiceWorkerUpdate()
+  const { updateAvailable, applyUpdate } = useServiceWorkerUpdate()
 
   // Pull-to-refresh for mobile PWA
   const { isPulling, isRefreshing, pullDistance } = usePullToRefresh({
@@ -323,10 +323,10 @@ const App: React.FC = () => {
         <div className="bg-accent-600 text-white text-center text-sm px-4 py-2.5 flex items-center justify-center gap-3">
           <span>A new version is available</span>
           <button
-            onClick={reloadForUpdate}
+            onClick={applyUpdate}
             className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-md font-medium text-xs transition-colors"
           >
-            Reload
+            Update now
           </button>
         </div>
       )}

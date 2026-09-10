@@ -105,6 +105,7 @@ Sets up a daily cron job (8:30 AM) for prices and exchange rates. Manual update 
 
 ```bash
 make dev            # Development with hot reload
+make check          # Frontend, PWA, privacy, and backend checks
 make deploy         # Production build and deploy
 make deploy-front   # Frontend only (~10s, needs Node on server)
 make deploy-back    # Backend only (~20s)
@@ -132,6 +133,9 @@ frontend/
 ├── types/        # TypeScript definitions
 └── utils/        # Formatters, storage, validators
 ```
+
+See [`docs/PWA.md`](docs/PWA.md) for the service-worker, offline-shell, and
+installed-app release contract.
 
 ## AI-agent access (MCP)
 

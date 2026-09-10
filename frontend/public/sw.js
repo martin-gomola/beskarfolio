@@ -1,7 +1,8 @@
 // BeskarFolio Service Worker
 // Build metadata is injected at build time by Vite.
 const BUILD_VERSION = '__BUILD_VERSION__'
-const CACHE_NAME = `beskarfolio-${BUILD_VERSION}`
+const CACHE_PREFIX = 'beskarfolio'
+const CACHE_NAME = `${CACHE_PREFIX}-${BUILD_VERSION}`
 const OFFLINE_DOCUMENT_URL = '/index.html'
 const PRECACHE_URLS = __PRECACHE_URLS__
 
@@ -51,27 +52,30 @@ const cachePutSafe = async (request, response) => {
 // Install: cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS)
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   )
-  // Activate immediately (don't wait for old SW to stop)
-  self.skipWaiting()
+})
+
+// A deployed worker stays waiting until the user accepts the update.
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'SKIP_WAITING') return
+  event.waitUntil(self.skipWaiting())
 })
 
 // Activate: clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys
-          .filter((key) => key.startsWith('beskarfolio-') && key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    })
+    Promise.all([
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith(`${CACHE_PREFIX}-`) && key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        )
+      ),
+      self.clients.claim(),
+    ])
   )
-  // Take control of all pages immediately
-  self.clients.claim()
 })
 
 // Fetch strategy:

@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
+import { startUpdateLifecycle } from './platform/updateLifecycle'
 import { initWebMCP } from './utils/webmcp'
 import './index.css'
 
@@ -15,16 +16,7 @@ initWebMCP()
 // stale SW left over from a prior prod build on the same origin.
 if ('serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then((reg) => {
-          console.log('SW registered:', reg.scope)
-          setInterval(() => reg.update(), 5 * 60 * 1000)
-        })
-        .catch((err) => {
-          console.log('SW registration failed:', err)
-        })
-    })
+    window.addEventListener('load', startUpdateLifecycle)
   } else {
     navigator.serviceWorker.getRegistrations()
       .then((regs) => regs.forEach((reg) => reg.unregister()))

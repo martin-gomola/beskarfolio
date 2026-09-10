@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run check:pwa",
+    "check:pwa": "node scripts/check-pwa.mjs",
     "test:browser-state": "node --test scripts/browser-portfolio-state.test.mjs",
     "postbuild": "node scripts/inject-analytics.mjs",
     "preview": "vite preview"
