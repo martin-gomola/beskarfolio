@@ -593,7 +593,6 @@ const App: React.FC = () => {
             <AIAnalysisPage
               holdings={holdings}
               summary={summary}
-              onNavigateToTab={navigateToTab}
             />
           </Suspense>
         )}
