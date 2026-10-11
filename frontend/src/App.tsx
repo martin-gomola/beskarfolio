@@ -563,8 +563,8 @@ const App: React.FC = () => {
         {activeTab === 'tax' && (
           <div className="space-y-4 sm:space-y-6 animate-fade-in">
             <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-100 font-heading">Tax-Free Planner</h2>
-              <p className="mt-1 text-sm text-gray-400">See what is safe to sell now and what becomes tax-free soon.</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-100 font-heading">Holding-period check</h2>
+              <p className="mt-1 text-sm text-gray-400">See which shares have met the app’s 365-day holding period and when the rest reach it.</p>
             </div>
 
             <Suspense fallback={<TabLoader />}>
