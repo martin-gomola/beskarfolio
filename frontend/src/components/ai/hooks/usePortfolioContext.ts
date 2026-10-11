@@ -47,8 +47,8 @@ const buildDataNotesSection = (exchangeRates: ExchangeRateContext | null): strin
     ? `- FX rate: USD -> EUR ${exchangeRates.usdEur.toFixed(4)}, EUR -> USD ${exchangeRates.eurUsd.toFixed(4)}${exchangeRates.updatedAt ? `, updated ${exchangeRates.updatedAt}` : ''} (source: ${exchangeRates.source}).`
     : '- FX rate: The exact EUR/USD rate used to convert US holdings is missing; do not estimate it and verify it before doing currency-sensitive calculations.'
 
-  return `### Data Notes / Assumptions:
-- Current market prices: The table includes each holding's current price in its native currency, but prices may be cached, stale, or estimated; verify exact live market prices before trading.
+  return `### Data Notes:
+- Price basis: Daily closing-price snapshots, refreshed each morning. Use the supplied prices and portfolio weights for this review; intraday quotes are not required. Any estimated prices are marked separately.
 ${exchangeRateLine}`
 }
 
@@ -98,8 +98,8 @@ export function usePortfolioContext(
         const avgPrice = h.avgPrice.toFixed(2)
         const currentPrice = h.currentPrice.toFixed(2)
         const pnl = `${h.gainLossPercent >= 0 ? '+' : ''}${h.gainLossPercent.toFixed(0)}%`
-        const priceStatus = h.priceStatus ? `, price status: ${h.priceStatus}${h.priceNote ? ` (${h.priceNote})` : ''}` : ''
-        return `- ${h.ticker} [${h.sector}, ${h.region}]: ${h.shares}x @ ${sym}${avgPrice} avg → ${sym}${currentPrice} now (${h.weight}%, ${pnl}${priceStatus})`
+        const priceBasis = h.priceStatus === 'estimated' ? ', estimated price' : ''
+        return `- ${h.ticker} [${h.sector}, ${h.region}]: ${h.shares}x @ ${sym}${avgPrice} avg → ${sym}${currentPrice} snapshot (${h.weight}%, ${pnl}${priceBasis})`
       })
       .join('\n')
 

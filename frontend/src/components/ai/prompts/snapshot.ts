@@ -24,8 +24,8 @@ export const snapshotPrompt: PromptDefinition = {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
-      const priceStatus = h.priceStatus ?? 'unknown'
-      return `| ${h.ticker} | ${h.shares} | ${sym}${avgPrice} | ${sym}${currentPrice} | ${h.currency} | ${priceStatus} | €${valueEur} | ${h.weight}% |`
+      const priceBasis = h.priceStatus === 'estimated' ? 'Estimated' : 'Closing-price snapshot'
+      return `| ${h.ticker} | ${h.shares} | ${sym}${avgPrice} | ${sym}${currentPrice} | ${h.currency} | ${priceBasis} | €${valueEur} | ${h.weight}% |`
     })
 
     const totalValueFmt = totalValue.toLocaleString('en-US', {
@@ -40,7 +40,7 @@ export const snapshotPrompt: PromptDefinition = {
 **Total Value:** €${totalValueFmt}
 **Holdings:** ${holdingsCount}
 
-| Ticker | Shares | Avg Cost | Current Price | Currency | Price Status | Current Value (EUR) | % of Portfolio |
+| Ticker | Shares | Avg Cost | Snapshot Price | Currency | Price Basis | Snapshot Value (EUR) | % of Portfolio |
 |--------|--------|----------|---------------|----------|--------------|---------------------|----------------|
 ${rows.join('\n')}
 

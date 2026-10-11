@@ -31,7 +31,7 @@ Focus on concentration, asset allocation, ETF overlap, currency exposure, and fi
 - Keep the response under 500 words in plain English
 - Reference actual holdings by ticker
 - Separate facts in the provided snapshot from assumptions and general research
-- Do not claim to know live prices, current valuations, or tax outcomes unless reliable current data is supplied
+- Use the supplied closing-price snapshots for allocation analysis. Do not invent live prices, valuation metrics, or tax facts
 - Do not invent target weights, expected returns, volatility, correlations, or an efficient frontier. Mathematical optimization requires suitable return data and explicit assumptions
 - Do not promise returns or present suggestions as personalized financial advice
 - Use clear language and explain trade-offs`
