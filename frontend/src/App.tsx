@@ -190,7 +190,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>(getTabFromHash)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [mobileHoldingsExpanded, setMobileHoldingsExpanded] = useState(false)
   
   // Scroll direction for hiding/showing bottom nav
   const scrollDirection = useScrollDirection(15)
@@ -245,12 +244,9 @@ const App: React.FC = () => {
     return () => window.removeEventListener('auto-refresh-prices', listener)
   }, [handleAutoRefresh])
 
-  // Keyboard shortcuts for escape key
+  // The mobile menu handles Escape here; transaction dialogs handle their own cancellation.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showAddModal) {
-        setShowAddModal(false)
-      }
       if (e.key === 'Escape' && showMobileMenu) {
         setShowMobileMenu(false)
       }
@@ -258,14 +254,14 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showAddModal, showMobileMenu])
+  }, [showMobileMenu])
 
   const handleTransactionAdded = async () => {
-    await handleDataUpdate()
     setShowAddModal(false)
+    await handleDataUpdate()
   }
 
-  if (loading) {
+  if (loading && (!summary || activeTab !== 'transactions')) {
     return (
       <PrivacyProvider>
         <BackendWakingOverlay />
@@ -395,7 +391,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+      <main aria-busy={loading} className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fade-in">
@@ -444,8 +440,6 @@ const App: React.FC = () => {
                   <HoldingsTable
                     holdings={holdings}
                     onUpdate={handleDataUpdate}
-                    mobileExpanded={mobileHoldingsExpanded}
-                    onMobileExpandedChange={setMobileHoldingsExpanded}
                   />
                 </div>
 
@@ -539,22 +533,23 @@ const App: React.FC = () => {
           <div className="space-y-4 sm:space-y-6 animate-fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-100 font-heading">Transaction Management</h2>
-                {/* <p className="text-gray-400 mt-1">View, edit, and manage all your transactions</p> */}
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-100 font-heading">Transactions</h2>
+                <p className="mt-1 text-sm text-gray-400">Record completed trades and dividends.</p>
               </div>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="bg-accent-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-accent-700 transition-all font-medium flex items-center justify-center gap-2 text-base sm:text-sm w-full sm:w-auto btn-press"
+                disabled={loading}
+                className="bg-accent-600 text-white px-4 py-3 sm:py-2 rounded-lg hover:bg-accent-700 transition-all font-medium flex items-center justify-center gap-2 text-base sm:text-sm w-full sm:w-auto btn-press disabled:opacity-50 disabled:cursor-wait"
               >
                 <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                Add Transaction
+                Add transaction
               </button>
             </div>
 
             <Suspense fallback={<TabLoader />}>
-              <AllTransactionsTable onUpdate={handleDataUpdate} />
+              <AllTransactionsTable onUpdate={handleDataUpdate} updating={loading} />
             </Suspense>
           </div>
         )}
@@ -611,6 +606,7 @@ const App: React.FC = () => {
       {/* Add Transaction Modal */}
       {showAddModal && (
         <AddTransactionModal
+          holdings={holdings}
           onClose={() => setShowAddModal(false)}
           onTransactionAdded={handleTransactionAdded}
         />

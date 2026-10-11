@@ -1,305 +1,196 @@
-import React, { useState, useMemo } from 'react'
-import { useTransactions, usePrivacyMode, useTableSort } from '../../hooks'
+import React, { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, Search, X } from 'lucide-react'
+import { useTransactions, usePrivacyMode } from '../../hooks'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
 import { Transaction } from '../../types'
+import { subscribeBrowserPortfolioState } from '../../services/browserPortfolioState'
 import { formatCurrency, getEffectiveCurrencyForTicker } from '../../utils'
 import { LoadingSpinner } from '../common'
-import { ActionRow } from '../common/ActionRow'
 import { EditTransactionModal } from './EditTransactionModal'
 
-type TxSortKey = 'date' | 'ticker' | 'type' | 'shares' | 'price' | 'total'
-
 const PAGE_SIZE = 25
+const activity = {
+  buy: { title: 'Bought', amount: 'Total paid', search: 'buy buys bought purchase purchases' },
+  sell: { title: 'Sold', amount: 'Sale proceeds', search: 'sell sells sold sale sales' },
+  dividend: { title: 'Dividend from', amount: 'Net dividend received', search: 'dividend dividends income' },
+}
+const dateValue = (date: string) => new Date(`${date.slice(0, 10)}T00:00:00`)
+const displayDate = (date: string) => dateValue(date).toLocaleDateString('en-GB', {
+  day: 'numeric', month: 'short', year: 'numeric',
+})
 
 interface AllTransactionsTableProps {
   onUpdate: () => void
+  updating?: boolean
 }
 
-/**
- * Table showing all transactions across all tickers
- * Includes filtering by type and search
- */
-export const AllTransactionsTable: React.FC<AllTransactionsTableProps> = ({ onUpdate }) => {
-  const { transactions, loading, refetch, deleteTransaction } = useTransactions()
+/** A chronological record of completed activity, using the existing transaction service. */
+export const AllTransactionsTable: React.FC<AllTransactionsTableProps> = ({ onUpdate, updating = false }) => {
+  const { transactions, loading, error, refetch, deleteTransaction } = useTransactions()
   const { isPrivate } = usePrivacyMode()
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [query, setQuery] = useState('')
   const [selectedTicker, setSelectedTicker] = useState('')
-  const [filterType, setFilterType] = useState<'all' | 'buy' | 'sell' | 'dividend'>('all')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const { sortBy, sortOrder, handleSort } = useTableSort<TxSortKey>('date', 'desc')
+  const [message, setMessage] = useState('')
 
-  const handleDelete = async (transactionId: number) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) return
-
-    try {
-      await deleteTransaction(transactionId)
-      await onUpdate()
-    } catch (error) {
-      console.error('Error deleting transaction:', error)
-      alert('Failed to delete transaction')
+  useEffect(() => subscribeBrowserPortfolioState(change => {
+    if (change.reason === 'create') {
+      setQuery('')
+      setSelectedTicker('')
+      setVisibleCount(PAGE_SIZE)
+      setMessage('Transaction saved.')
     }
+  }), [])
+
+  const filteredTransactions = useMemo(() => {
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    return transactions.filter(transaction => {
+      if (selectedTicker && transaction.ticker !== selectedTicker) return false
+      const month = dateValue(transaction.date).toLocaleDateString('en-GB', { month: 'long' })
+      const text = `${transaction.ticker} ${activity[transaction.type].search} ${transaction.date} ${displayDate(transaction.date)} ${month}`.toLowerCase()
+      return terms.every(term => text.includes(term))
+    }).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+  }, [transactions, query, selectedTicker])
+
+  const tickerOptions = [...new Set(transactions.map(transaction => transaction.ticker))].sort()
+
+  const visibleTransactions = filteredTransactions.slice(0, visibleCount)
+  const countLabel = query.trim() || selectedTicker
+    ? `${filteredTransactions.length} matching transaction${filteredTransactions.length === 1 ? '' : 's'}`
+    : `${transactions.length} transaction${transactions.length === 1 ? '' : 's'}`
+  const historyLabel = updating ? 'Updating portfolio totals…'
+    : loading ? 'Loading transaction history…'
+    : error ? 'History unavailable' : `${countLabel} · Most recent first`
+  const groups = new Map<string, Transaction[]>()
+  visibleTransactions.forEach(transaction => {
+    const month = transaction.date.slice(0, 7)
+    groups.set(month, [...(groups.get(month) ?? []), transaction])
+  })
+
+  const changeQuery = (value: string) => {
+    setQuery(value)
+    setVisibleCount(PAGE_SIZE)
+  }
+
+  const clearFilters = () => {
+    changeQuery('')
+    setSelectedTicker('')
   }
 
   const handleSave = async () => {
     await refetch()
-    await onUpdate()
-  }
-
-  const uniqueTickers = useMemo(() => {
-    return [...new Set(transactions.map(t => t.ticker))].sort()
-  }, [transactions])
-
-  const filteredTransactions = useMemo(() => {
-    const filtered = transactions
-      .filter(t => filterType === 'all' || t.type.toLowerCase() === filterType)
-      .filter(t => !selectedTicker || t.ticker === selectedTicker)
-
-    return [...filtered].sort((a, b) => {
-      let cmp = 0
-      switch (sortBy) {
-        case 'date':    cmp = a.date.localeCompare(b.date); break
-        case 'ticker':  cmp = a.ticker.localeCompare(b.ticker); break
-        case 'type':    cmp = a.type.localeCompare(b.type); break
-        case 'shares':  cmp = a.shares - b.shares; break
-        case 'price':   cmp = a.price - b.price; break
-        case 'total':   cmp = (a.total_value ?? a.shares * a.price) - (b.total_value ?? b.shares * b.price); break
-      }
-      return sortOrder === 'asc' ? cmp : -cmp
-    })
-  }, [transactions, filterType, selectedTicker, sortBy, sortOrder])
-
-  const visibleTransactions = filteredTransactions.slice(0, visibleCount)
-  const hasMore = visibleCount < filteredTransactions.length
-
-  if (loading) {
-    return (
-      <div className="glass rounded-xl p-6">
-        <LoadingSpinner message="Loading transactions..." />
-      </div>
-    )
+    onUpdate()
+    setMessage('Transaction updated.')
   }
 
   return (
     <>
-      <div className="glass rounded-xl overflow-hidden">
-        <div className="px-4 sm:px-5 py-4 border-b border-white/5">
-          <div className="flex flex-col gap-3">
-            <h2 className="text-base sm:text-lg font-semibold text-white tracking-tight">All Transactions</h2>
-
-            {/* Filter by type - Segmented Control */}
-            <div className="flex gap-1 bg-white/5 p-1 rounded-xl w-full">
-                <button
-                  onClick={() => { setFilterType('all'); setVisibleCount(PAGE_SIZE) }}
-                  className={`flex-1 px-3 py-2 sm:py-1.5 rounded-lg text-sm sm:text-xs font-medium transition-all ${
-                    filterType === 'all' ? 'bg-accent-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => { setFilterType('buy'); setVisibleCount(PAGE_SIZE) }}
-                  className={`flex-1 px-3 py-2 sm:py-1.5 rounded-lg text-sm sm:text-xs font-medium transition-all ${
-                    filterType === 'buy' ? 'bg-emerald-500 text-white shadow-sm' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Buy
-                </button>
-                <button
-                  onClick={() => { setFilterType('sell'); setVisibleCount(PAGE_SIZE) }}
-                  className={`flex-1 px-3 py-2 sm:py-1.5 rounded-lg text-sm sm:text-xs font-medium transition-all ${
-                    filterType === 'sell' ? 'bg-rose-500 text-white shadow-sm' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Sell
-                </button>
-                <button
-                  onClick={() => { setFilterType('dividend'); setVisibleCount(PAGE_SIZE) }}
-                  className={`flex-1 px-3 py-2 sm:py-1.5 rounded-lg text-sm sm:text-xs font-medium transition-all ${
-                    filterType === 'dividend' ? 'bg-violet-500 text-white shadow-sm' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Div
-                </button>
+      <div className="glass overflow-hidden rounded-xl" aria-busy={loading || updating}>
+        <div className="space-y-3 border-b border-white/10 p-4 sm:p-5">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,0.5fr)]">
+            <div>
+              <label htmlFor="transaction-search" className="mb-2 block text-sm font-medium text-gray-300">Find a transaction</label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+                <input
+                  id="transaction-search"
+                  type="search"
+                  value={query}
+                  onChange={event => changeQuery(event.target.value)}
+                  placeholder="Symbol, activity, or date"
+                  className="min-h-11 w-full rounded-lg border border-white/10 bg-white/[0.025] py-2.5 pl-10 pr-12 text-base text-white placeholder:text-gray-400 focus:border-accent-400 focus:outline-none sm:text-sm [&::-webkit-search-cancel-button]:appearance-none"
+                />
+                {query && (
+                  <button type="button" onClick={() => changeQuery('')} aria-label="Clear transaction search" className="absolute right-0 top-0 flex h-full min-w-11 items-center justify-center rounded-lg text-gray-400 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400">
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
-
-            {/* Ticker filter dropdown */}
-            <select
-              value={selectedTicker}
-              onChange={(e) => { setSelectedTicker(e.target.value); setVisibleCount(PAGE_SIZE) }}
-              className="w-48 px-3 py-1.5 text-sm bg-white/5 border border-white/5 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-500/50 text-gray-100 appearance-none cursor-pointer"
-              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center' }}
-            >
-              <option value="">All tickers</option>
-              {uniqueTickers.map(ticker => (
-                <option key={ticker} value={ticker}>{ticker}</option>
-              ))}
-            </select>
-
-            <span className="text-sm text-gray-500">{filteredTransactions.length} of {transactions.length}</span>
+            <div>
+              <label htmlFor="transaction-investment-filter" className="mb-2 block text-sm font-medium text-gray-300">Investment</label>
+              <div className="relative">
+                <select
+                  id="transaction-investment-filter"
+                  value={selectedTicker}
+                  onChange={event => { setSelectedTicker(event.target.value); setVisibleCount(PAGE_SIZE) }}
+                  className="min-h-11 w-full appearance-none rounded-lg border border-white/10 bg-surface-elevated py-2.5 pl-3 pr-12 text-base text-white focus:border-accent-400 focus:outline-none sm:text-sm [color-scheme:dark]"
+                >
+                  <option value="">All investments</option>
+                  {tickerOptions.map(ticker => <option key={ticker} value={ticker}>{ticker}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+              </div>
+            </div>
           </div>
+          <p aria-live="polite" className="text-xs text-gray-400">
+            {historyLabel}
+          </p>
+          {message && <p role="status" className="text-sm text-accent-300">{message}</p>}
         </div>
 
-        {/* Mobile: compact list with explicit edit action */}
-        <div className="sm:hidden divide-y divide-white/5">
-          {visibleTransactions.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">No transactions found</div>
-          ) : (
-            visibleTransactions.map((transaction) => {
-              const effectiveCurrency = getEffectiveCurrencyForTicker(transaction.ticker, transaction.currency)
-              return (
-                <ActionRow key={transaction.id} onAction={() => setEditingTransaction(transaction)}>
-                  <div className="w-full flex items-center gap-3 px-4 py-3">
-                  
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-medium text-sm text-accent-400">{transaction.ticker}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                          transaction.type === 'buy' ? 'bg-emerald-500/10 text-emerald-400'
-                          : transaction.type === 'dividend' ? 'bg-violet-500/10 text-violet-400'
-                          : 'bg-rose-500/10 text-rose-400'
-                        }`}>
-                          {transaction.type === 'dividend' ? 'DIV' : transaction.type.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(transaction.date).toLocaleDateString()} · {isPrivate ? PRIVACY_MASK : `${transaction.shares} shares`}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-white whitespace-nowrap block">
-                        {isPrivate ? PRIVACY_MASK : formatCurrency(transaction.total_value, effectiveCurrency)}
-                      </span>
-                      <span className="text-xs text-gray-500 whitespace-nowrap block">
-                        {isPrivate ? PRIVACY_MASK : `@ ${formatCurrency(transaction.price, effectiveCurrency)}`}
-                      </span>
-                    </div>
-                  </div>
-                </ActionRow>
-              )
-            })
-          )}
-        </div>
-
-        {/* Desktop: Full table with sorting */}
-        <div className="overflow-x-auto hidden sm:block">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-black/20 border-b border-white/5">
-                {([
-                  { key: 'date' as TxSortKey, label: 'Date', align: 'left', hide: '' },
-                  { key: 'ticker' as TxSortKey, label: 'Ticker', align: 'left', hide: '' },
-                  { key: 'type' as TxSortKey, label: 'Type', align: 'left', hide: '' },
-                  { key: 'shares' as TxSortKey, label: 'Shares', align: 'right', hide: '' },
-                  { key: 'price' as TxSortKey, label: 'Price', align: 'right', hide: '' },
-                  { key: 'total' as TxSortKey, label: 'Total', align: 'right', hide: '' },
-                ]).map(col => (
-                  <th
-                    key={col.key}
-                    onClick={() => handleSort(col.key)}
-                    className={`${col.align === 'right' ? 'text-right' : 'text-left'} py-3 px-5 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none hover:text-gray-300 transition-colors ${col.hide}`}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      {col.label}
-                      {sortBy === col.key && (
-                        <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
-                          {sortOrder === 'asc'
-                            ? <path d="M6 2l4 5H2z" />
-                            : <path d="M6 10L2 5h8z" />}
-                        </svg>
-                      )}
-                    </span>
-                  </th>
-                ))}
-                <th className="w-24"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {visibleTransactions.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
-                    No transactions found
-                  </td>
-                </tr>
-              ) : (
-                visibleTransactions.map((transaction) => {
-                  const effectiveCurrency = getEffectiveCurrencyForTicker(transaction.ticker, transaction.currency)
+        {loading && transactions.length === 0 ? (
+          <div role="status" className="p-6"><LoadingSpinner message="Loading your transaction history…" /></div>
+        ) : error ? (
+          <div role="alert" className="p-5 text-sm text-gray-300">
+            <p>Could not load your transaction history.</p>
+            <button type="button" onClick={() => void refetch()} className="mt-3 min-h-11 rounded-lg border border-white/10 px-4 text-accent-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400">Try again</button>
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="p-6 text-center sm:p-8">
+            <h3 className="text-base font-semibold text-white">No transactions yet</h3>
+            <p className="mt-2 text-sm text-gray-400">Use Add transaction to record a completed buy, sale, or dividend.</p>
+          </div>
+        ) : filteredTransactions.length === 0 ? (
+          <div className="p-6 text-center">
+            <h3 className="text-base font-semibold text-white">No matching transactions</h3>
+            <button type="button" onClick={clearFilters} className="mt-2 min-h-11 rounded-lg px-3 text-sm text-accent-300 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400">Clear filters</button>
+          </div>
+        ) : (
+          Array.from(groups, ([month, monthTransactions]) => (
+            <section key={month} aria-label={dateValue(`${month}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}>
+              <h3 className="border-y border-white/5 bg-white/[0.02] px-4 py-2.5 text-xs font-medium text-gray-400 sm:px-5">
+                {dateValue(`${month}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+              </h3>
+              <ul className="divide-y divide-white/5">
+                {monthTransactions.map(transaction => {
+                  const currency = getEffectiveCurrencyForTicker(transaction.ticker, transaction.currency)
+                  const type = activity[transaction.type]
+                  const amount = transaction.total_value ?? (transaction.type === 'dividend' ? transaction.price : transaction.shares * transaction.price)
                   return (
-                  <tr key={transaction.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3 px-5 text-sm text-gray-400">
-                      {new Date(transaction.date).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-5">
-                      <span className="font-mono font-medium text-sm text-accent-400">{transaction.ticker}</span>
-                    </td>
-                    <td className="py-3 px-5">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${
-                        transaction.type === 'buy'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : transaction.type === 'dividend'
-                          ? 'bg-violet-500/10 text-violet-400'
-                          : 'bg-rose-500/10 text-rose-400'
-                      }`}>
-                        {transaction.type === 'dividend' ? 'DIV' : transaction.type.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="py-3 px-5 text-right text-sm text-gray-300">{isPrivate ? PRIVACY_MASK : transaction.shares}</td>
-                    <td className="py-3 px-5 text-right text-sm text-gray-400">
-                      {isPrivate ? PRIVACY_MASK : formatCurrency(transaction.price, effectiveCurrency)}
-                    </td>
-                    <td className="py-3 px-5 text-right text-sm text-white font-medium">
-                      {isPrivate ? PRIVACY_MASK : formatCurrency(transaction.total_value, effectiveCurrency)}
-                    </td>
-                    <td className="py-3 px-5">
-                      <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => setEditingTransaction(transaction)}
-                          className="p-1.5 text-accent-400 hover:bg-accent-500/10 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(transaction.id)}
-                          className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            <line x1="10" y1="11" x2="10" y2="17"/>
-                            <line x1="14" y1="11" x2="14" y2="17"/>
-                          </svg>
-                        </button>
+                    <li key={transaction.id} className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-3 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-5 sm:px-5">
+                      <div className="col-span-2 min-w-0 sm:col-span-1">
+                        <h4 className="text-sm font-medium text-gray-100">{type.title} <span className="break-words font-mono text-accent-400">{transaction.ticker}</span></h4>
+                        <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                          <time dateTime={transaction.date}>{displayDate(transaction.date)}</time>
+                          {transaction.type !== 'dividend' && <span> · {isPrivate ? PRIVACY_MASK : `${transaction.shares.toLocaleString('en-GB', { maximumFractionDigits: 20 })} ${transaction.shares === 1 ? 'share' : 'shares'} at ${formatCurrency(transaction.price, currency)}`}</span>}
+                        </p>
                       </div>
-                    </td>
-                  </tr>
-                )})
-              )}
-            </tbody>
-          </table>
-        </div>
+                      <div className="min-w-0 sm:text-right">
+                        <p className="break-words text-sm font-semibold tabular-nums text-white">{isPrivate ? PRIVACY_MASK : formatCurrency(amount, currency)}</p>
+                        <p className="mt-0.5 text-xs text-gray-400">{type.amount}</p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={loading || updating}
+                        onClick={() => { setMessage(''); setEditingTransaction(transaction) }}
+                        aria-label={`Edit ${transaction.type} for ${transaction.ticker} on ${displayDate(transaction.date)}`}
+                        className="min-h-11 self-center rounded-lg border border-white/10 px-3 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-wait"
+                      >Edit</button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))
+        )}
 
-        {hasMore && (
-          <div className="px-4 sm:px-5 py-3 border-t border-white/5 flex items-center justify-between">
-            <span className="text-xs text-gray-500">
-              Showing {visibleCount} of {filteredTransactions.length}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
-                className="px-3 py-1.5 text-xs font-medium text-accent-400 hover:bg-accent-500/10 rounded-lg transition-colors"
-              >
-                Show more
-              </button>
-              <button
-                onClick={() => setVisibleCount(filteredTransactions.length)}
-                className="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded-lg transition-colors"
-              >
-                Show all
-              </button>
-            </div>
+        {visibleCount < filteredTransactions.length && (
+          <div className="border-t border-white/10 px-4 py-3 sm:px-5">
+            <button type="button" onClick={() => setVisibleCount(count => count + PAGE_SIZE)} className="min-h-11 w-full rounded-lg text-sm font-medium text-accent-300 hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-400">
+              Show {Math.min(PAGE_SIZE, filteredTransactions.length - visibleCount)} more transactions
+            </button>
           </div>
         )}
       </div>
@@ -309,6 +200,11 @@ export const AllTransactionsTable: React.FC<AllTransactionsTableProps> = ({ onUp
           transaction={editingTransaction}
           onClose={() => setEditingTransaction(null)}
           onSave={handleSave}
+          onDelete={async () => {
+            await deleteTransaction(editingTransaction.id)
+            onUpdate()
+            setMessage('Transaction deleted.')
+          }}
         />
       )}
     </>

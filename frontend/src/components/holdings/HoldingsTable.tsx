@@ -11,8 +11,6 @@ import { FiftyTwoWeekChip } from './FiftyTwoWeekChip'
 interface HoldingsTableProps {
   holdings: Holding[]
   onUpdate: () => void
-  mobileExpanded?: boolean
-  onMobileExpandedChange?: (expanded: boolean) => void
 }
 
 type ColumnKey = 'shares' | 'avgPrice' | 'invested' | 'currentPrice' | 'value' | 'return'
@@ -43,8 +41,6 @@ const DEFAULT_COLUMNS: VisibleColumns = {
 export const HoldingsTable: React.FC<HoldingsTableProps> = ({
   holdings,
   onUpdate,
-  mobileExpanded = false,
-  onMobileExpandedChange,
 }) => {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null)
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null)
@@ -189,16 +185,6 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onMobileExpandedChange?.(!mobileExpanded)}
-              aria-expanded={mobileExpanded}
-              aria-controls="mobile-holdings-list"
-              className="min-h-11 rounded-lg border border-white/[0.07] bg-white/[0.03] px-3 text-sm font-medium text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-2 focus:ring-accent-500/50 md:hidden"
-            >
-              {mobileExpanded ? 'Hide details' : `View all ${holdings.length}`}
-            </button>
-            
             {/* Column Selector */}
             <div className="relative hidden md:block">
               <button
@@ -310,7 +296,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
           </div>
 
           {/* Search Bar */}
-          <div className={`${mobileExpanded ? 'flex' : 'hidden'} items-center gap-2 sm:gap-3 md:flex`}>
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="relative flex-1">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/>
@@ -338,7 +324,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
           </div>
         </div>
 
-        <div id="mobile-holdings-list" className={`${mobileExpanded ? 'divide-y divide-white/5' : 'hidden'} md:hidden`}>
+        <div id="mobile-holdings-list" className="divide-y divide-white/5 md:hidden">
           {filteredHoldings.map((holding) => {
             const returnColor = getReturnColor(holding)
             const isExpanded = expandedTicker === holding.ticker
