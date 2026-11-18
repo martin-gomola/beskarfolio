@@ -3,7 +3,6 @@ Public price service facade over storage, provider orchestration, and history he
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import yfinance as yf
@@ -11,93 +10,10 @@ import yfinance as yf
 from logic.prices.orchestrator import PriceOrchestrator
 from logic.prices.shared import (
     get_cache_threshold_hours,
-    get_effective_currency_for_ticker,
-    get_file_fetch_metadata,
     logger,
-    normalize_ticker,
 )
-from logic.prices.storage import CSVStorageManager, get_historical_file_status, list_historical_tickers
-
-
-def _parse_snapshot_result(snapshot: Dict[str, object]) -> Dict[str, Any]:
-    """Build a price result dict from a latest_prices.json snapshot entry."""
-    updated_at_raw = snapshot.get("updated_at")
-    updated_at = None
-    if isinstance(updated_at_raw, str):
-        try:
-            updated_at = datetime.fromisoformat(updated_at_raw)
-        except ValueError:
-            updated_at = None
-
-    if updated_at is None:
-        updated_at = datetime.now(timezone.utc)
-    elif updated_at.tzinfo is None:
-        updated_at = updated_at.replace(tzinfo=timezone.utc)
-
-    age_hours = (datetime.now(updated_at.tzinfo) - updated_at).total_seconds() / 3600
-    market_date = snapshot.get("market_date") or updated_at.date().isoformat()
-
-    return {
-        "price": float(snapshot["price"]),
-        "date": str(market_date),
-        "age_hours": age_hours,
-        "fetched_at": updated_at.isoformat(),
-        "fetch_age_hours": age_hours,
-        "source": snapshot.get("source", "snapshot"),
-    }
-
-
-def _build_csv_result(entry, csv_path: str) -> Dict[str, Any]:
-    """Build a price result dict from a cached CSV series entry."""
-    result: Dict[str, Any] = {
-        "price": entry.latest_close,
-        "date": entry.latest_date_str,
-        "age_hours": (datetime.now(entry.latest_dt_utc.tzinfo) - entry.latest_dt_utc).total_seconds() / 3600,
-        "source": "daily_close",
-    }
-
-    fetch_metadata = get_file_fetch_metadata(csv_path)
-    if fetch_metadata is not None:
-        fetched_at, fetch_age_hours = fetch_metadata
-        result["fetched_at"] = fetched_at.isoformat()
-        result["fetch_age_hours"] = fetch_age_hours
-
-    return result
-
-
-def get_latest_price(ticker: str) -> Optional[Dict[str, Any]]:
-    """Get the latest price, preferring whichever of snapshot or CSV is newer.
-
-    The cron job updates CSVs with daily closes and only writes snapshots
-    during open market hours.  Previously the snapshot always won, which
-    could serve a stale intraday price even when the CSV already had a
-    more recent daily close.
-    """
-    try:
-        normalized_ticker = normalize_ticker(ticker)
-
-        snapshot = CSVStorageManager.load_latest_snapshot(normalized_ticker)
-        entry = CSVStorageManager.load_cached_series(normalized_ticker)
-
-        snap_result = _parse_snapshot_result(snapshot) if snapshot else None
-        csv_result = (
-            _build_csv_result(entry, CSVStorageManager.get_csv_path(normalized_ticker))
-            if entry
-            else None
-        )
-
-        if snap_result and csv_result:
-            snap_date_str = str(snap_result["date"])[:10]
-            csv_date_str = str(csv_result["date"])[:10]
-
-            if csv_date_str > snap_date_str:
-                return csv_result
-            return snap_result
-
-        return snap_result or csv_result
-    except Exception as e:
-        logger.debug(f"Could not load price for {ticker}: {e}")
-        return None
+from logic.prices.read_model import get_latest_price
+from logic.prices.storage import CSVStorageManager, get_historical_file_status
 
 
 def get_price_with_cache(
@@ -140,43 +56,6 @@ def update_all_prices(force_refresh: bool = False) -> Dict[str, Any]:
         "cached_count": 0,
         "errors": ["Database removed - provide tickers in request"],
     }
-
-
-def get_all_prices(
-    tickers: Optional[List[str]] = None,
-    ticker_currencies: Optional[Dict[str, str]] = None,
-) -> Dict[str, Dict[str, Any]]:
-    """Get all current prices from historical CSV files."""
-    ticker_data: Dict[str, str] = {}
-    if tickers is not None:
-        for ticker in tickers:
-            if not ticker:
-                continue
-            normalized_ticker = normalize_ticker(ticker)
-            if ticker_currencies and normalized_ticker in ticker_currencies:
-                ticker_data[normalized_ticker] = get_effective_currency_for_ticker(
-                    normalized_ticker,
-                    ticker_currencies[normalized_ticker],
-                )
-            else:
-                ticker_data[normalized_ticker] = get_effective_currency_for_ticker(normalized_ticker)
-    else:
-        ticker_data = {ticker: get_effective_currency_for_ticker(ticker) for ticker in list_historical_tickers()}
-
-    prices: Dict[str, Dict[str, Any]] = {}
-    for ticker, currency in ticker_data.items():
-        latest = get_latest_price(ticker)
-        if latest:
-            prices[ticker] = {
-                "price": latest["price"],
-                "currency": currency,
-                "date": latest["date"],
-                "age_hours": latest["age_hours"],
-                "fetched_at": latest.get("fetched_at"),
-                "fetch_age_hours": latest.get("fetch_age_hours"),
-            }
-
-    return prices
 
 
 def get_historical_file_status_for_ticker(ticker: str) -> Dict[str, Any]:

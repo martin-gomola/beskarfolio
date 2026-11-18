@@ -16,7 +16,8 @@ from logic.prices.read_model import (
     get_price_range,
     get_price_status,
 )
-from logic.prices.service import get_historical_file_status_for_ticker, get_latest_price
+from logic.prices.read_model import get_latest_price
+from logic.prices.service import get_historical_file_status_for_ticker
 from logic.prices.storage import CSVStorageManager, PricePersistenceError
 from config import settings
 

@@ -32,8 +32,8 @@ from logic.prices.read_model import (
     get_price_status,
 )
 from logic.prices.refresh import PriceRefreshMode, refresh_prices
+from logic.prices.read_model import get_all_prices
 from logic.prices.service import (
-    get_all_prices,
     get_historical_file_status_for_ticker,
     update_all_prices,
 )

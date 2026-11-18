@@ -135,7 +135,7 @@ class PriceRefreshReport:
 
 def _load_latest_price(ticker: str) -> Optional[Dict[str, object]]:
     # Local import keeps the read model independent from the refresh implementation.
-    from logic.prices.service import get_latest_price
+    from logic.prices.read_model import get_latest_price
 
     return get_latest_price(ticker)
 

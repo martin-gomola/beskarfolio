@@ -13,7 +13,7 @@ from logic.models import AnnualPerformanceRequest, AnnualPerformanceResponse, Di
 
 # Rate limiter for this module
 limiter = Limiter(key_func=get_remote_address)
-from logic.prices.service import get_all_prices
+from logic.prices.read_model import get_all_prices
 from logic.portfolio_state import build_ticker_currency_map, normalize_transactions
 
 logger = logging.getLogger(__name__)
