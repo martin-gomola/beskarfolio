@@ -3,6 +3,7 @@ import { PortfolioSummary as PortfolioSummaryType } from '../../types'
 import { usePriceStatus, usePrivacyMode } from '../../hooks'
 import { useAnnualPerformance } from '../../hooks/useAnnualPerformance'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
+import { isPriceFetchStale } from '../../utils/priceFreshness'
 
 /**
  * Format number with full precision
@@ -60,60 +61,19 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
     }
   }, [performanceData])
 
-  // Format price update info using status_counts from API
-  const getPriceInfo = () => {
-    if (!priceStatus || !priceStatus.has_prices) {
-      return { text: 'No price data', color: 'text-gray-500' }
-    }
-
-    // Use pre-computed counts from API (no iteration needed)
-    const { cached = 0, recent = 0, stale = 0 } = priceStatus.status_counts || {}
-    const totalFresh = cached + recent
-    const allFresh = totalFresh === priceStatus.prices_count
-    const allStale = stale === priceStatus.prices_count
-
-    let lastUpdate = 'Unknown'
-    let color = 'text-gray-400'
-
-    if (priceStatus.last_update) {
-      try {
-        const date = new Date(priceStatus.last_update)
-        const now = new Date()
-        const diffMs = now.getTime() - date.getTime()
-        const diffMins = Math.floor(diffMs / 60000)
-        const diffHours = Math.floor(diffMs / 3600000)
-
-        // Prices are previous-day closes refreshed daily, so a few days of age
-        // (weekend, holiday) is expected and shown quietly. Only warn beyond that.
-        const EXPECTED_MAX_AGE_HOURS = 96
-        if (diffMins < 60) {
-          lastUpdate = diffMins < 1 ? 'just now' : `${diffMins}m ago`
-        } else if (diffHours < 24) {
-          lastUpdate = `${diffHours}h ago`
-        } else {
-          lastUpdate = `${Math.floor(diffHours / 24)}d ago`
-        }
-        if (diffHours >= EXPECTED_MAX_AGE_HOURS) {
-          color = allStale ? 'text-red-400' : 'text-yellow-400'
-        }
-      } catch {
-        lastUpdate = 'Unknown'
-      }
-    }
-
-    return {
-      text: lastUpdate,
-      color,
-      tooltip: allFresh
-        ? 'All prices current'
-        : allStale
-        ? `All prices stale (${stale} need update)`
-        : `${totalFresh} current, ${stale} stale`
-    }
-  }
-
-  const priceInfo = getPriceInfo()
-  const pricesNeedAttention = priceInfo.color === 'text-yellow-400' || priceInfo.color === 'text-red-400'
+  // Price freshness: closes come from a morning refresh, so judge against the
+  // last trading day (Friday's close over the weekend), not raw hours.
+  const priceInfo = (() => {
+    if (!priceStatus || !priceStatus.has_prices) return { label: 'No price data', stale: false }
+    const fetchedAt = priceStatus.last_update ? new Date(priceStatus.last_update) : null
+    if (!fetchedAt || Number.isNaN(fetchedAt.getTime())) return { label: 'unknown', stale: true }
+    const diffMins = Math.max(0, Math.floor((Date.now() - fetchedAt.getTime()) / 60000))
+    const label = diffMins < 1 ? 'just now'
+      : diffMins < 60 ? `${diffMins}m ago`
+      : diffMins < 1440 ? `${Math.floor(diffMins / 60)}h ago`
+      : `${Math.floor(diffMins / 1440)}d ago`
+    return { label, stale: isPriceFetchStale(fetchedAt) }
+  })()
 
   const refreshPrices = async () => {
     if (!onRefreshPrices || priceRefreshState === 'loading') return
@@ -121,22 +81,6 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
     const succeeded = await onRefreshPrices()
     setPriceRefreshState(succeeded ? 'idle' : 'error')
   }
-  
-  const getPriceIndicator = () => {
-    if (!priceStatus || !priceStatus.has_prices) return { dotClass: 'bg-gray-500', label: 'No data' }
-    
-    const { color, text } = priceInfo
-    
-    if (color === 'text-yellow-400') {
-      return { dotClass: 'bg-yellow-400', label: text }
-    } else if (color === 'text-red-400') {
-      return { dotClass: 'bg-red-400', label: text }
-    } else {
-      return { dotClass: 'bg-gray-500', label: text }
-    }
-  }
-  
-  const priceIndicator = getPriceIndicator()
 
   const portfolioDataInfo = portfolioCalculatedAt
     ? (() => {
@@ -184,9 +128,24 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
               </span>
             )}
             {priceStatus && priceStatus.has_prices && (
-              <span className={`${pricesNeedAttention ? 'hidden' : 'mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex'}`}>
+              <span className={`mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex ${priceInfo.stale ? 'text-amber-300' : ''}`}>
                 <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>
-                Close prices {priceIndicator.label}
+                <span title={priceInfo.stale ? 'Newer closing prices should be available' : undefined}>
+                  Close prices {priceInfo.label}
+                </span>
+                {onRefreshPrices && (
+                  <button
+                    type="button"
+                    onClick={refreshPrices}
+                    disabled={priceRefreshState === 'loading'}
+                    className="ml-1 rounded underline decoration-dotted underline-offset-2 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/50 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {priceRefreshState === 'loading' ? 'Updating…' : 'Update'}
+                  </button>
+                )}
+                {priceRefreshState === 'error' && (
+                  <span role="alert" className="ml-1 text-loss">Update failed</span>
+                )}
               </span>
             )}
           </p>
@@ -226,34 +185,6 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
           )}
         </div>
       </div>
-
-      {pricesNeedAttention && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-3 py-2.5">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-amber-200">
-              Last price update: {priceIndicator.label}
-            </div>
-            <div className="text-xs text-amber-200/60">
-              Refresh before relying on today&apos;s portfolio value.
-            </div>
-            {priceRefreshState === 'error' && (
-              <div role="alert" className="mt-1 text-xs text-loss">
-                Prices could not be refreshed. Try again later.
-              </div>
-            )}
-          </div>
-          {onRefreshPrices && (
-            <button
-              type="button"
-              onClick={refreshPrices}
-              disabled={priceRefreshState === 'loading'}
-              className="min-h-11 shrink-0 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-300/15 focus:outline-none focus:ring-2 focus:ring-amber-300/50 disabled:cursor-wait disabled:opacity-60"
-            >
-              {priceRefreshState === 'loading' ? 'Updating…' : 'Update'}
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Mobile: one clear answer first, secondary performance beneath it. */}
       <div className="glass rounded-xl p-4 sm:hidden">
