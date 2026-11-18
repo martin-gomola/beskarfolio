@@ -27,7 +27,8 @@ export const buildGuidanceSection = (ctx: PromptContext): string => {
 - Depth: ${depthInstruction}
 - Use only the portfolio data provided here plus clearly labeled general market knowledge.
 - Do not invent missing prices, dividend yields, valuations, or tax facts.
-- Call out stale, missing, or assumed data before making a recommendation.
+- Use the supplied closing-price snapshots; intraday quotes are not required for this review.
+- Call out missing, estimated, or assumed data when it affects a recommendation.
 - Separate facts from assumptions.
 - Avoid presenting buy or sell actions as certainty.
 - End with what I should verify before acting.

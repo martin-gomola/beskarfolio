@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { transactionService } from '../services'
+import { subscribeBrowserPortfolioState } from '../services/browserPortfolioState'
 import { Transaction } from '../types'
 
 export const useTransactions = (ticker?: string) => {
@@ -7,7 +8,7 @@ export const useTransactions = (ticker?: string) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       setLoading(true)
       const data = ticker 
@@ -20,11 +21,18 @@ export const useTransactions = (ticker?: string) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [ticker])
 
   useEffect(() => {
-    fetchTransactions()
-  }, [ticker])
+    void fetchTransactions()
+    const refresh = () => { void fetchTransactions() }
+    const unsubscribe = subscribeBrowserPortfolioState(refresh)
+    window.addEventListener('storage', refresh)
+    return () => {
+      unsubscribe()
+      window.removeEventListener('storage', refresh)
+    }
+  }, [fetchTransactions])
 
   const deleteTransaction = async (id: number) => {
     await transactionService.delete(id)
