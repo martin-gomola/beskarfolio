@@ -3,7 +3,8 @@
  */
 export const formatCurrency = (value: number, currency: string = 'EUR'): string => {
   const symbol = currency === 'USD' ? '$' : '€'
-  return `${symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const amount = Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${value < 0 ? '-' : ''}${symbol}${amount}`
 }
 
 /**

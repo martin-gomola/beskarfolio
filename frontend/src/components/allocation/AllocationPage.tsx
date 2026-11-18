@@ -88,6 +88,11 @@ export function AllocationPage() {
       : []
   }, [status])
 
+  const driftScaleMax = Math.min(
+    100,
+    Math.max(1, ...sortedDrift.map((item) => Math.max(item.current_weight_pct, item.target_weight_pct))) * 1.1,
+  )
+
   const biggestMove = sortedDrift[0]
   const coreTotal = sortedDrift
     .filter((item) => CORE_HINTS.some((hint) => item.ticker.includes(hint)))
@@ -248,7 +253,7 @@ export function AllocationPage() {
               </div>
               <div className="divide-y divide-white/[0.06]">
                 {sortedDrift.map((item) => (
-                  <TickerAllocationRow key={item.ticker} item={item} />
+                  <TickerAllocationRow key={item.ticker} item={item} scaleMax={driftScaleMax} />
                 ))}
               </div>
             </section>
@@ -349,13 +354,15 @@ function AllocationBar({ label, value, tone }: { label: string; value: number; t
   )
 }
 
-function TickerAllocationRow({ item }: { item: AllocationData }) {
+function TickerAllocationRow({ item, scaleMax }: { item: AllocationData; scaleMax: number }) {
   const action = getActionMeta(item)
   const ActionIcon = action.icon
   const currentPrice = item.current_shares > 0 ? item.current_value_eur / item.current_shares : 0
   const sharesToTrade = currentPrice > 0 ? Math.round(Math.abs(item.drift_value_eur) / currentPrice) : 0
-  const currentWidth = Math.min(Math.max(item.current_weight_pct, 0), 100)
-  const targetWidth = Math.min(Math.max(item.target_weight_pct, 0), 100)
+  // Shared scale across rows so bar lengths are comparable between tickers.
+  const toWidth = (pct: number) => Math.min(Math.max(pct, 0) / scaleMax, 1) * 100
+  const currentWidth = toWidth(item.current_weight_pct)
+  const targetWidth = toWidth(item.target_weight_pct)
 
   return (
     <div className="p-4 sm:p-5">
@@ -366,16 +373,22 @@ function TickerAllocationRow({ item }: { item: AllocationData }) {
         </div>
 
         <div>
-          <div className="mb-2 grid grid-cols-3 gap-3 text-xs text-gray-500">
-            <span>Current {item.current_weight_pct.toFixed(1)}%</span>
-            <span className="text-center">Target {item.target_weight_pct.toFixed(1)}%</span>
-            <span className={`text-right ${item.drift_pct > 0 ? 'text-rose-300' : item.drift_pct < 0 ? 'text-emerald-300' : 'text-gray-400'}`}>
-              {item.drift_pct > 0 ? '+' : ''}{item.drift_pct.toFixed(1)}%
+          <div className="mb-2 flex items-baseline justify-between gap-3 text-xs tabular-nums text-gray-500">
+            <span>
+              <span className="text-gray-200">{item.current_weight_pct.toFixed(1)}%</span> now · target {item.target_weight_pct.toFixed(1)}%
+            </span>
+            <span className="text-gray-300">
+              {item.drift_pct > 0 ? '+' : ''}{item.drift_pct.toFixed(1)} pp
             </span>
           </div>
-          <div className="relative h-3 rounded-full bg-white/[0.07]">
-            <div className="absolute inset-y-0 left-0 rounded-full bg-white/15" style={{ width: `${currentWidth}%` }} />
-            <div className="absolute inset-y-0 left-0 rounded-full bg-accent-500" style={{ width: `${targetWidth}%` }} />
+          {/* Bullet graph: bar = current weight, tick = target weight */}
+          <div
+            className="relative h-3 rounded-sm bg-white/[0.05]"
+            role="img"
+            aria-label={`Current ${item.current_weight_pct.toFixed(1)}%, target ${item.target_weight_pct.toFixed(1)}%`}
+          >
+            <div className="absolute inset-y-0.5 left-0 rounded-sm bg-gray-400/70" style={{ width: `${currentWidth}%` }} />
+            <div className="absolute -inset-y-1 w-0.5 -translate-x-1/2 bg-white" style={{ left: `${targetWidth}%` }} />
           </div>
         </div>
 

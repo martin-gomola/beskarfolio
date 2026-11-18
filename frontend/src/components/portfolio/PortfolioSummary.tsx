@@ -3,6 +3,7 @@ import { PortfolioSummary as PortfolioSummaryType } from '../../types'
 import { usePriceStatus, usePrivacyMode } from '../../hooks'
 import { useAnnualPerformance } from '../../hooks/useAnnualPerformance'
 import { PRIVACY_MASK } from '../../hooks/usePrivacyMode'
+import { isPriceFetchStale } from '../../utils/priceFreshness'
 
 /**
  * Format number with full precision
@@ -60,61 +61,19 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
     }
   }, [performanceData])
 
-  // Format price update info using status_counts from API
-  const getPriceInfo = () => {
-    if (!priceStatus || !priceStatus.has_prices) {
-      return { text: 'No price data', color: 'text-gray-500' }
-    }
-
-    // Use pre-computed counts from API (no iteration needed)
-    const { cached = 0, recent = 0, stale = 0 } = priceStatus.status_counts || {}
-    const totalFresh = cached + recent
-    const allFresh = totalFresh === priceStatus.prices_count
-    const allStale = stale === priceStatus.prices_count
-
-    let lastUpdate = 'Unknown'
-    let color = 'text-gray-400'
-
-    if (priceStatus.last_update) {
-      try {
-        const date = new Date(priceStatus.last_update)
-        const now = new Date()
-        const diffMs = now.getTime() - date.getTime()
-        const diffMins = Math.floor(diffMs / 60000)
-        const diffHours = Math.floor(diffMs / 3600000)
-
-        if (diffMins < 1) {
-          lastUpdate = 'Just now'
-          color = 'text-green-400'
-        } else if (diffMins < 60) {
-          lastUpdate = `${diffMins}m ago`
-          color = 'text-green-400'
-        } else if (diffHours < 24) {
-          lastUpdate = `${diffHours}h ago`
-          color = allFresh ? 'text-green-400' : 'text-yellow-400'
-        } else {
-          const days = Math.floor(diffHours / 24)
-          lastUpdate = `${days}d ago`
-          color = allStale ? 'text-red-400' : 'text-yellow-400'
-        }
-      } catch {
-        lastUpdate = 'Unknown'
-      }
-    }
-
-    return {
-      text: lastUpdate,
-      color,
-      tooltip: allFresh
-        ? 'All prices current'
-        : allStale
-        ? `All prices stale (${stale} need update)`
-        : `${totalFresh} current, ${stale} stale`
-    }
-  }
-
-  const priceInfo = getPriceInfo()
-  const pricesNeedAttention = priceInfo.color === 'text-yellow-400' || priceInfo.color === 'text-red-400'
+  // Price freshness: closes come from a morning refresh, so judge against the
+  // last trading day (Friday's close over the weekend), not raw hours.
+  const priceInfo = (() => {
+    if (!priceStatus || !priceStatus.has_prices) return { label: 'No price data', stale: false }
+    const fetchedAt = priceStatus.last_update ? new Date(priceStatus.last_update) : null
+    if (!fetchedAt || Number.isNaN(fetchedAt.getTime())) return { label: 'unknown', stale: true }
+    const diffMins = Math.max(0, Math.floor((Date.now() - fetchedAt.getTime()) / 60000))
+    const label = diffMins < 1 ? 'just now'
+      : diffMins < 60 ? `${diffMins}m ago`
+      : diffMins < 1440 ? `${Math.floor(diffMins / 60)}h ago`
+      : `${Math.floor(diffMins / 1440)}d ago`
+    return { label, stale: isPriceFetchStale(fetchedAt) }
+  })()
 
   const refreshPrices = async () => {
     if (!onRefreshPrices || priceRefreshState === 'loading') return
@@ -122,24 +81,6 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
     const succeeded = await onRefreshPrices()
     setPriceRefreshState(succeeded ? 'idle' : 'error')
   }
-  
-  const getPriceIndicator = () => {
-    if (!priceStatus || !priceStatus.has_prices) return { dotClass: 'bg-gray-500', label: 'No data' }
-    
-    const { color, text } = priceInfo
-    
-    if (color === 'text-green-400') {
-      return { dotClass: 'bg-green-400', label: text }
-    } else if (color === 'text-yellow-400') {
-      return { dotClass: 'bg-yellow-400', label: text }
-    } else if (color === 'text-red-400') {
-      return { dotClass: 'bg-red-400', label: text }
-    } else {
-      return { dotClass: 'bg-gray-500', label: text }
-    }
-  }
-  
-  const priceIndicator = getPriceIndicator()
 
   const portfolioDataInfo = portfolioCalculatedAt
     ? (() => {
@@ -187,11 +128,24 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
               </span>
             )}
             {priceStatus && priceStatus.has_prices && (
-              <span className={`${pricesNeedAttention ? 'hidden' : 'mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex'}`}>
+              <span className={`mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex ${priceInfo.stale ? 'text-amber-300' : ''}`}>
                 <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>
-                Prices:
-                <span className={`inline-block w-2 h-2 rounded-full ${priceIndicator.dotClass}`} aria-hidden="true" />
-                <span className={priceInfo.color}>{priceIndicator.label}</span>
+                <span title={priceInfo.stale ? 'Newer closing prices should be available' : undefined}>
+                  Close prices {priceInfo.label}
+                </span>
+                {onRefreshPrices && (
+                  <button
+                    type="button"
+                    onClick={refreshPrices}
+                    disabled={priceRefreshState === 'loading'}
+                    className="ml-1 rounded underline decoration-dotted underline-offset-2 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/50 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {priceRefreshState === 'loading' ? 'Updating…' : 'Update'}
+                  </button>
+                )}
+                {priceRefreshState === 'error' && (
+                  <span role="alert" className="ml-1 text-loss">Update failed</span>
+                )}
               </span>
             )}
           </p>
@@ -232,34 +186,6 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
         </div>
       </div>
 
-      {pricesNeedAttention && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.07] px-3 py-2.5">
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-amber-200">
-              Last price update: {priceIndicator.label}
-            </div>
-            <div className="text-xs text-amber-200/60">
-              Refresh before relying on today&apos;s portfolio value.
-            </div>
-            {priceRefreshState === 'error' && (
-              <div role="alert" className="mt-1 text-xs text-loss">
-                Prices could not be refreshed. Try again later.
-              </div>
-            )}
-          </div>
-          {onRefreshPrices && (
-            <button
-              type="button"
-              onClick={refreshPrices}
-              disabled={priceRefreshState === 'loading'}
-              className="min-h-11 shrink-0 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-300/15 focus:outline-none focus:ring-2 focus:ring-amber-300/50 disabled:cursor-wait disabled:opacity-60"
-            >
-              {priceRefreshState === 'loading' ? 'Updating…' : 'Update'}
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Mobile: one clear answer first, secondary performance beneath it. */}
       <div className="glass rounded-xl p-4 sm:hidden">
         <div className="text-xs font-medium uppercase tracking-wider text-gray-500">Portfolio value</div>
@@ -269,13 +195,13 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
 
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
           <div>
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Total return</div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Unrealized return</div>
             <div className={`mt-1 text-xl font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
               {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss_pct >= 0 ? '+' : ''}${summary.total_gain_loss_pct.toFixed(2)}%`}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Profit & loss</div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Unrealized P&L</div>
             <div className={`mt-1 text-xl font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
               {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}
             </div>
@@ -332,7 +258,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
             </svg>
-            Return
+            Unrealized return
           </div>
           <div className={`text-2xl sm:text-3xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : returnColor}`}>
             {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss_pct >= 0 ? '+' : ''}${summary.total_gain_loss_pct.toFixed(2)}%`}
@@ -384,7 +310,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
-            P&L
+            Unrealized P&L
           </div>
           <div className={`text-2xl sm:text-3xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : returnColor}`}>
             {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}

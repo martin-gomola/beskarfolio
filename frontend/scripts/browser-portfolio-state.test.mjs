@@ -335,3 +335,18 @@ test('keeps a service-worker update waiting until the user accepts it', async ()
     })
   }
 })
+
+test('price freshness expects the last trading-day close from the morning refresh', async () => {
+  const { isPriceFetchStale } = await vite.ssrLoadModule('/src/utils/priceFreshness.ts')
+  const at = (iso) => new Date(iso) // local time, no Z
+  // Tuesday 11:00: needs today's refresh (Monday close).
+  assert.equal(isPriceFetchStale(at('2026-11-17T08:30'), at('2026-11-17T11:00')), false)
+  assert.equal(isPriceFetchStale(at('2026-11-16T08:30'), at('2026-11-17T11:00')), true)
+  // Tuesday 08:00: today's refresh may not have run; Monday's fetch is fine.
+  assert.equal(isPriceFetchStale(at('2026-11-16T08:30'), at('2026-11-17T08:00')), false)
+  // Monday 11:00: a Saturday fetch holds Friday's close; Friday's fetch does not.
+  assert.equal(isPriceFetchStale(at('2026-11-14T08:30'), at('2026-11-16T11:00')), false)
+  assert.equal(isPriceFetchStale(at('2026-11-13T08:30'), at('2026-11-16T11:00')), true)
+  // Sunday: Saturday fetch is current.
+  assert.equal(isPriceFetchStale(at('2026-11-14T08:30'), at('2026-11-15T18:00')), false)
+})

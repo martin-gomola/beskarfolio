@@ -230,7 +230,7 @@ const YearSummaryCard: React.FC<YearSummaryCardProps> = ({ data, periodLabel, be
                   {isPrivate ? PRIVACY_MASK : formatPercent(data.total_gain_pct)}
                 </p>
                 <p className={`mt-2 text-lg sm:text-xl font-medium ${isPrivate ? 'text-gray-500' : getGainColor(data.total_gain)}`}>
-                  {isPrivate ? PRIVACY_MASK : `${formatCurrency(data.total_gain)} total gain`}
+                  {isPrivate ? PRIVACY_MASK : `${formatCurrency(data.total_gain)} total gain incl. realized`}
                 </p>
                 <p className="mt-3 text-sm text-gray-500">
                   {formatDate(data.start_date)} - {formatDate(data.end_date)}

@@ -11,6 +11,9 @@ interface PerformanceChartProps {
   }>
 }
 
+const formatMonthTick = (ts: number) =>
+  new Date(ts).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '")
+
 export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
   const [viewMode, setViewMode] = useState<'value' | 'performance'>('performance')
   
@@ -19,6 +22,9 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
     return null
   }
   
+  // Numeric timestamps give the x-axis true time spacing; sample dates are irregular.
+  const chartData = data.map((point) => ({ ...point, ts: Date.parse(point.date) }))
+
   // Check if benchmark data is available
   const hasBenchmarkData = data && data.length > 0 && data[0]?.portfolio_return_pct !== undefined
   
@@ -123,10 +129,15 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
         <ResponsiveContainer width="100%" height="100%">
           {viewMode === 'performance' && hasBenchmarkData ? (
             // Performance View (Normalized Returns %)
-            <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
+            <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <CartesianGrid vertical={false} stroke="#ffffff" strokeOpacity={0.06} />
+              <XAxis
+                dataKey="ts"
+                type="number"
+                scale="time"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={formatMonthTick}
+                minTickGap={24}
                 stroke="#9CA3AF"
                 style={{ fontSize: '12px' }}
                 tick={{ fill: '#9CA3AF' }}
@@ -144,7 +155,7 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
                 formatter={(value) => <span style={{ color: '#9CA3AF' }}>{value}</span>}
               />
               <Line 
-                type="monotone" 
+                type="linear"
                 dataKey="portfolio_return_pct" 
                 stroke="#10B981" 
                 strokeWidth={2}
@@ -153,7 +164,7 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
                 activeDot={{ r: 6 }}
               />
               <Line 
-                type="monotone" 
+                type="linear"
                 dataKey="benchmark_return_pct" 
                 stroke="#6B7280" 
                 strokeWidth={2}
@@ -164,10 +175,15 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
             </LineChart>
           ) : (
             // Value View (Portfolio Value vs Invested)
-            <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis 
-                dataKey="date" 
+            <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <CartesianGrid vertical={false} stroke="#ffffff" strokeOpacity={0.06} />
+              <XAxis
+                dataKey="ts"
+                type="number"
+                scale="time"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={formatMonthTick}
+                minTickGap={24}
                 stroke="#9CA3AF"
                 style={{ fontSize: '12px' }}
                 tick={{ fill: '#9CA3AF' }}
@@ -185,7 +201,7 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
                 formatter={(value) => <span style={{ color: '#9CA3AF' }}>{value}</span>}
               />
               <Line 
-                type="monotone" 
+                type="linear"
                 dataKey="value" 
                 stroke="#10B981" 
                 strokeWidth={2}
@@ -194,7 +210,7 @@ export const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
                 activeDot={{ r: 6 }}
               />
               <Line 
-                type="monotone" 
+                type="linear"
                 dataKey="invested" 
                 stroke="#3B82F6" 
                 strokeWidth={2}
