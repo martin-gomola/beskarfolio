@@ -56,6 +56,9 @@ Do not bypass these seams from API routes, scripts, or frontend code.
 
 - `backend/logic/portfolio_state.py` normalizes transactions and builds open
   holdings.
+- `backend/logic/portfolio_valuation.py` values open holdings at current
+  quotes and FX (stale and estimated quote policy, EUR totals). Routes fetch
+  prices from the price read model and pass them in.
 - `backend/logic/tax_free.py` owns Slovak 365-day FIFO tax status.
 - `backend/logic/annual_performance.py` and
   `backend/logic/performance_history.py` own performance calculations.

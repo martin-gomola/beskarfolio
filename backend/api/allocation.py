@@ -15,7 +15,7 @@ from logic.allocation import (
     generate_rebalancing_plan
 )
 from logic.models import AllocationStatusResponse, MAX_TRANSACTIONS, RebalancePlanResponse
-from logic.prices.service import get_all_prices
+from logic.prices.read_model import get_all_prices
 from logic.portfolio_state import (
     build_open_holdings,
     build_ticker_currency_map,
@@ -77,11 +77,8 @@ async def get_allocation_status(request: GuestAllocationStatusRequest) -> Alloca
     - Returns current allocation, drift, and rebalancing needs
     """
     try:
-        # Debug logging
-        logger.info(f"📥 Allocation status request: {len(request.transactions)} transactions")
-        logger.info(f"📥 Target allocations: {request.target_allocations}")
-        if request.transactions:
-            logger.info(f"📥 First transaction: {request.transactions[0]}")
+        # Log counts only: the backend must not persist user transactions or targets.
+        logger.debug("Allocation status request: %d transactions", len(request.transactions))
         normalized_transactions = normalize_transactions(request.transactions)
         holdings = build_open_holdings(normalized_transactions)
         ticker_currencies = build_ticker_currency_map(normalized_transactions)

@@ -78,16 +78,20 @@ def calculate_current_allocation(
         currency = holding.get('currency', 'EUR')
         price_data = prices.get(ticker)
         
-        # Extract price from price_data dict
-        if not price_data or shares <= 0:
+        if shares <= 0:
             continue
-        
+
         # prices.get(ticker) returns {'price': 123.45, 'currency': 'USD', ...}
         price = price_data.get('price') if isinstance(price_data, dict) else price_data
-        
+
         if not price or price <= 0:
-            logger.warning(f"Invalid price for {ticker}: {price_data}")
-            continue
+            # Same policy as portfolio_valuation: an unquoted holding is valued at
+            # cost basis so weights and totals match the dashboard. The rebalancing
+            # plan still skips trades for it because it has no entry in `prices`.
+            price = holding.get('avg_buy_price') or 0
+            if price <= 0:
+                logger.warning(f"No quote or cost basis for {ticker}; excluded from allocation")
+                continue
         
         # Calculate value in native currency
         value_native = shares * Decimal(str(price))

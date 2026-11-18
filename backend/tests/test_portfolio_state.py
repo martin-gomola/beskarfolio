@@ -1,6 +1,8 @@
 import unittest
 
 from logic.allocation import calculate_current_allocation
+from logic.currency_service import convert_to_eur
+from logic.portfolio_valuation import value_portfolio
 from logic.portfolio_state import (
     build_holdings_state,
     build_open_holdings,
@@ -56,6 +58,60 @@ class PortfolioStateTests(unittest.TestCase):
         self.assertIn("VWCE.DE", allocation["allocations"])
         self.assertIn("AAPL", allocation["allocations"])
         self.assertGreater(allocation["total_value_eur"], 0)
+
+
+class PortfolioValuationTests(unittest.TestCase):
+    def test_value_portfolio_applies_quote_policy_and_eur_totals(self) -> None:
+        transactions = normalize_transactions([
+            {"ticker": "VWCE.DE", "type": "buy", "date": "2024-01-01", "shares": 10, "price": 100},
+            {"ticker": "SXR8.DE", "type": "buy", "date": "2024-01-01", "shares": 2, "price": 500},
+            {"ticker": "MISS.DE", "type": "buy", "date": "2024-01-01", "shares": 4, "price": 25},
+            {"ticker": "AAPL", "type": "buy", "date": "2024-01-01", "shares": 2, "price": 150, "currency": "USD"},
+            {"ticker": "AAPL", "type": "sell", "date": "2024-02-01", "shares": 1, "price": 160, "currency": "USD"},
+        ])
+        prices = {
+            "VWCE.DE": {"price": 120.0, "fetch_age_hours": 1},
+            "SXR8.DE": {"price": 450.0, "fetch_age_hours": 1000},
+            "AAPL": {"price": 200.0, "fetch_age_hours": 1},
+        }
+
+        summary, holdings = value_portfolio(transactions, prices)
+        by_ticker = {h["ticker"]: h for h in holdings}
+
+        self.assertEqual(by_ticker["VWCE.DE"]["price_status"], "current")
+        self.assertEqual(by_ticker["VWCE.DE"]["current_value_eur"], 1200.0)
+        self.assertEqual(by_ticker["SXR8.DE"]["price_status"], "stale")
+        # No quote: valued at cost basis, no gain.
+        self.assertEqual(by_ticker["MISS.DE"]["price_status"], "estimated")
+        self.assertEqual(by_ticker["MISS.DE"]["current_value_eur"], 100.0)
+        self.assertEqual(by_ticker["MISS.DE"]["gain_loss"], 0)
+        # Sell reduces cost basis proportionally: 1 AAPL left at $150.
+        self.assertEqual(by_ticker["AAPL"]["shares"], 1)
+        self.assertEqual(by_ticker["AAPL"]["invested_value"], 150)
+        self.assertEqual(by_ticker["AAPL"]["current_value_eur"], round(convert_to_eur(200.0, "USD"), 2))
+
+        self.assertEqual(summary.holdings_count, 4)
+        self.assertEqual(summary.estimated_holdings_count, 1)
+        self.assertEqual(summary.transaction_count, 5)
+        self.assertAlmostEqual(summary.total_value, sum(h["current_value_eur"] for h in holdings), places=1)
+        self.assertAlmostEqual(
+            summary.total_gain_loss, summary.total_value - summary.total_invested, places=1
+        )
+
+
+    def test_allocation_matches_valuation_when_a_quote_is_missing(self) -> None:
+        transactions = normalize_transactions([
+            {"ticker": "VWCE.DE", "type": "buy", "date": "2024-01-01", "shares": 10, "price": 100},
+            {"ticker": "MISS.DE", "type": "buy", "date": "2024-01-01", "shares": 4, "price": 25},
+        ])
+        prices = {"VWCE.DE": {"price": 120.0, "fetch_age_hours": 1}}
+
+        summary, _ = value_portfolio(transactions, prices)
+        allocation = calculate_current_allocation(build_open_holdings(transactions), prices)
+
+        self.assertAlmostEqual(allocation["total_value_eur"], summary.total_value, places=2)
+        self.assertAlmostEqual(allocation["allocations"]["MISS.DE"]["value_eur"], 100.0)
+        self.assertAlmostEqual(allocation["allocations"]["MISS.DE"]["weight_pct"], 100 / 1300 * 100)
 
 
 if __name__ == "__main__":
