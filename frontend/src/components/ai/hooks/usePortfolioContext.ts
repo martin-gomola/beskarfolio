@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { formatCurrency } from '../../../utils/formatters'
 import { Holding, PortfolioSummary, TaxFreeHolding, Transaction } from '../../../types'
 import { TickerInfo, AISettings, PortfolioHolding, TICKER_INFO_CACHE_KEY } from '../types'
 import { TICKER_SECTORS, ETF_PATTERNS, HORIZON_LABELS, GOAL_LABELS } from '../constants'
@@ -154,7 +155,7 @@ ${profile?.goal ? `- **Primary Goal:** ${GOAL_LABELS[profile.goal]}` : ''}
 ## My Portfolio
 ${shouldIncludeProfile ? `\n${profileSection}\n` : ''}
 **Total Value:** €${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-**Total P&L:** €${totalGainLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%)
+**Total P&L:** ${formatCurrency(totalGainLoss)} (${totalReturn >= 0 ? '+' : ''}${totalReturn.toFixed(2)}%)
 **Number of Holdings:** ${holdings.length}
 
 ### Sector Breakdown:

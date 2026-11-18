@@ -269,13 +269,13 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
 
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
           <div>
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Total return</div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Unrealized return</div>
             <div className={`mt-1 text-xl font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
               {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss_pct >= 0 ? '+' : ''}${summary.total_gain_loss_pct.toFixed(2)}%`}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Profit & loss</div>
+            <div className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Unrealized P&L</div>
             <div className={`mt-1 text-xl font-semibold tabular-nums ${isPrivate ? 'text-gray-500' : returnColor}`}>
               {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}
             </div>
@@ -332,7 +332,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
             </svg>
-            Return
+            Unrealized return
           </div>
           <div className={`text-2xl sm:text-3xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : returnColor}`}>
             {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss_pct >= 0 ? '+' : ''}${summary.total_gain_loss_pct.toFixed(2)}%`}
@@ -384,7 +384,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
-            P&L
+            Unrealized P&L
           </div>
           <div className={`text-2xl sm:text-3xl font-semibold tracking-tight ${isPrivate ? 'text-gray-500' : returnColor}`}>
             {isPrivate ? PRIVACY_MASK : `${summary.total_gain_loss >= 0 ? '+' : '-'}€${formatNumber(Math.abs(summary.total_gain_loss))}`}

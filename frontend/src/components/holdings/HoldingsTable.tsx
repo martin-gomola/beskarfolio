@@ -109,13 +109,13 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
     if (holding.price_status === 'estimated') {
       return (
         <div className="flex flex-col items-end">
-          <span className="text-amber-300">{formatCurrency(holding.current_value, holding.currency)}</span>
+          <span className="text-amber-300">{formatCurrency(holding.current_value_eur, 'EUR')}</span>
           <span className="text-[11px] text-amber-500/80">estimated value</span>
         </div>
       )
     }
 
-    return formatCurrency(holding.current_value, holding.currency)
+    return formatCurrency(holding.current_value_eur, 'EUR')
   }
 
   const getReturnColor = (holding: Holding): string => {
@@ -143,7 +143,8 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
       return 'Estimated'
     }
 
-    return `${holding.gain_loss >= 0 ? '+' : ''}${formatCurrency(holding.gain_loss, holding.currency)}`
+    const gainEur = holding.current_value_eur - holding.invested_value_eur
+    return `${gainEur >= 0 ? '+' : ''}${formatCurrency(gainEur, 'EUR')}`
   }
 
   const renderReturnPercent = (holding: Holding): string => {
@@ -168,7 +169,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
           comparison = a.ticker.localeCompare(b.ticker)
           break
         case 'value':
-          comparison = a.current_value - b.current_value
+          comparison = a.current_value_eur - b.current_value_eur
           break
         case 'return':
           comparison = a.gain_loss_pct - b.gain_loss_pct
@@ -517,7 +518,7 @@ export const HoldingsTable: React.FC<HoldingsTableProps> = ({
                         <td className="py-3 sm:py-4 px-3 sm:px-6 text-right text-sm text-gray-300 lg:table-cell">{isPrivate ? PRIVACY_MASK : formatCurrency(holding.avg_buy_price, holding.currency)}</td>
                       )}
                       {visibleColumns.invested && (
-                        <td className="py-3 sm:py-4 px-3 sm:px-6 text-right text-sm text-gray-300 lg:table-cell">{isPrivate ? PRIVACY_MASK : formatCurrency(holding.shares * holding.avg_buy_price, holding.currency)}</td>
+                        <td className="py-3 sm:py-4 px-3 sm:px-6 text-right text-sm text-gray-300 lg:table-cell">{isPrivate ? PRIVACY_MASK : formatCurrency(holding.invested_value_eur, 'EUR')}</td>
                       )}
                       {visibleColumns.currentPrice && (
                         <td className="py-3 sm:py-4 px-3 sm:px-6 text-right text-sm text-gray-100 font-medium lg:table-cell">
