@@ -83,18 +83,17 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
         const diffMins = Math.floor(diffMs / 60000)
         const diffHours = Math.floor(diffMs / 3600000)
 
-        if (diffMins < 1) {
-          lastUpdate = 'Just now'
-          color = 'text-green-400'
-        } else if (diffMins < 60) {
-          lastUpdate = `${diffMins}m ago`
-          color = 'text-green-400'
+        // Prices are previous-day closes refreshed daily, so a few days of age
+        // (weekend, holiday) is expected and shown quietly. Only warn beyond that.
+        const EXPECTED_MAX_AGE_HOURS = 96
+        if (diffMins < 60) {
+          lastUpdate = diffMins < 1 ? 'just now' : `${diffMins}m ago`
         } else if (diffHours < 24) {
           lastUpdate = `${diffHours}h ago`
-          color = allFresh ? 'text-green-400' : 'text-yellow-400'
         } else {
-          const days = Math.floor(diffHours / 24)
-          lastUpdate = `${days}d ago`
+          lastUpdate = `${Math.floor(diffHours / 24)}d ago`
+        }
+        if (diffHours >= EXPECTED_MAX_AGE_HOURS) {
           color = allStale ? 'text-red-400' : 'text-yellow-400'
         }
       } catch {
@@ -128,9 +127,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
     
     const { color, text } = priceInfo
     
-    if (color === 'text-green-400') {
-      return { dotClass: 'bg-green-400', label: text }
-    } else if (color === 'text-yellow-400') {
+    if (color === 'text-yellow-400') {
       return { dotClass: 'bg-yellow-400', label: text }
     } else if (color === 'text-red-400') {
       return { dotClass: 'bg-red-400', label: text }
@@ -189,9 +186,7 @@ export const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({
             {priceStatus && priceStatus.has_prices && (
               <span className={`${pricesNeedAttention ? 'hidden' : 'mt-0.5 flex items-center gap-1 sm:mt-0 sm:ml-2 sm:inline-flex'}`}>
                 <span className="hidden sm:inline" aria-hidden="true">·&nbsp;</span>
-                Prices:
-                <span className={`inline-block w-2 h-2 rounded-full ${priceIndicator.dotClass}`} aria-hidden="true" />
-                <span className={priceInfo.color}>{priceIndicator.label}</span>
+                Close prices {priceIndicator.label}
               </span>
             )}
           </p>
