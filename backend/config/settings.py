@@ -11,7 +11,7 @@ import re
 from typing import List, Optional
 
 # Application version - single source of truth
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 
 
 class Settings:
