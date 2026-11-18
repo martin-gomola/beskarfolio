@@ -99,5 +99,20 @@ class PortfolioValuationTests(unittest.TestCase):
         )
 
 
+    def test_allocation_matches_valuation_when_a_quote_is_missing(self) -> None:
+        transactions = normalize_transactions([
+            {"ticker": "VWCE.DE", "type": "buy", "date": "2024-01-01", "shares": 10, "price": 100},
+            {"ticker": "MISS.DE", "type": "buy", "date": "2024-01-01", "shares": 4, "price": 25},
+        ])
+        prices = {"VWCE.DE": {"price": 120.0, "fetch_age_hours": 1}}
+
+        summary, _ = value_portfolio(transactions, prices)
+        allocation = calculate_current_allocation(build_open_holdings(transactions), prices)
+
+        self.assertAlmostEqual(allocation["total_value_eur"], summary.total_value, places=2)
+        self.assertAlmostEqual(allocation["allocations"]["MISS.DE"]["value_eur"], 100.0)
+        self.assertAlmostEqual(allocation["allocations"]["MISS.DE"]["weight_pct"], 100 / 1300 * 100)
+
+
 if __name__ == "__main__":
     unittest.main()
